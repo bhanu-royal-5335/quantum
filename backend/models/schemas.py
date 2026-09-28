@@ -137,6 +137,65 @@ class SimulationResult(BaseModel):
     qber_vs_turbulence_curve: List[Dict[str, Any]]
     qber_vs_pointing_curve: List[Dict[str, float]]
     key_rate_vs_conditions_curve: List[Dict[str, Any]]
+    qber_vs_loss_curve: List[Dict[str, Any]] = Field(default_factory=list)
+
+    # Quantum simulation & validation comparison
+    reference_qber: Optional[float] = None
+    qber_difference: Optional[float] = None
+    quantum_simulation_stats: Optional[Dict[str, Any]] = None
+
+
+class QberComparison(BaseModel):
+    simulated_qber: float
+    reference_qber: float
+    absolute_difference: float
+    relative_difference_percent: float
+    is_within_tolerance: bool
+    status: str
+
+
+class QuantumSimulationRequest(BaseModel):
+    num_bits: int = Field(10000, ge=1000, le=100000, description="Total raw quantum bits prepared by Alice")
+    channel_loss_db: float = Field(20.0, ge=0.0, le=80.0, description="Total link channel attenuation in dB")
+    mean_photon_number: float = Field(0.6, ge=0.05, le=2.0, description="Mean photon number per pulse (mu)")
+    detector_efficiency: float = Field(0.80, ge=0.05, le=1.0, description="Single-photon detector quantum efficiency (eta_det)")
+    dark_count_rate: float = Field(1e-6, ge=1e-8, le=1e-2, description="Detector dark count probability per gate")
+    background_noise: float = Field(1e-6, ge=1e-8, le=1e-2, description="Ambient optical background noise probability")
+    optical_error_rate: float = Field(0.015, ge=0.001, le=0.15, description="Optical misalignment error rate (e_opt)")
+    repetition_rate: float = Field(10_000_000.0, ge=100_000.0, le=1_000_000_000.0, description="Laser repetition rate in Hz")
+    fec_efficiency: float = Field(1.16, ge=1.0, le=2.0, description="Error correction inefficiency factor (f_EC)")
+    scintillation_index: Optional[float] = Field(0.05, ge=0.0, le=2.0, description="Atmospheric scintillation index")
+    pointing_jitter_urad: Optional[float] = Field(3.0, ge=0.0, le=30.0, description="Pointing jitter in microradians")
+    sample_trace_count: int = Field(35, ge=10, le=100, description="Number of bit traces returned for visualization")
+    reference_qber: Optional[float] = Field(None, description="Optional dataset or reference QBER to validate against")
+
+
+class QuantumSimulationResponse(BaseModel):
+    id: str
+    timestamp: str
+    num_bits: int
+    photons_transmitted: int
+    photons_detected: int
+    detection_rate: float
+    raw_key_length: int
+    basis_matched_count: int
+    sifted_key_length: int
+    sifting_ratio: float
+    error_bits: int
+    simulated_qber: float
+    analytical_qber: float
+    qber_std_error: float
+    reference_qber: Optional[float] = None
+    qber_difference: Optional[float] = None
+    secret_key_rate: float
+    secure_key_length: int
+    is_secure: bool
+    security_status_message: str
+    channel_loss_db: float
+    snr_db: float
+    bit_samples: List[BitTrace]
+    qber_vs_loss_curve: List[Dict[str, Any]] = Field(default_factory=list)
+    qber_comparison: Optional[QberComparison] = None
 
 
 class ScenarioComparisonResponse(BaseModel):

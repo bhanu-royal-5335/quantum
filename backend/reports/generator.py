@@ -384,14 +384,26 @@ def generate_pdf_report(sim: SimulationResult, comparison_scenarios: Optional[Li
     story.append(PageBreak())
 
     # ================= SECTION 11: QBER RESULTS =================
-    story.append(Paragraph("11. Quantum Bit Error Rate (QBER) Results", h1_style))
+    story.append(Paragraph("11. Quantum Bit Error Rate (QBER) Results & Validation", h1_style))
     qber_summary = [
         [Paragraph("Metric", table_header_style), Paragraph("Observed Value", table_header_style), Paragraph("Benchmark / Bound", table_header_style)],
-        [Paragraph("Simulated QBER", table_cell_style), Paragraph(f"<b>{sim.qber*100.0:.3f} %</b>", table_cell_style), Paragraph("< 11.0% (BB84 Security Threshold)", table_cell_style)],
+        [Paragraph("Simulated BB84 QBER", table_cell_style), Paragraph(f"<b>{sim.qber*100.0:.3f} %</b>", table_cell_style), Paragraph("< 11.0% (BB84 Security Threshold)", table_cell_style)],
         [Paragraph("Sifted Bit Errors", table_cell_style), Paragraph(f"{sim.error_bits:,} bits", table_cell_style), Paragraph(f"Out of {sim.sifted_key_length:,} sifted bits", table_cell_style)],
         [Paragraph("Optical Misalignment Floor", table_cell_style), Paragraph(f"{p.optical_error_rate*100.0:.2f} %", table_cell_style), Paragraph("Hardware alignment baseline", table_cell_style)],
         [Paragraph("Noise Contribution to QBER", table_cell_style), Paragraph(f"{max(0.0, (sim.qber - p.optical_error_rate))*100.0:.3f} %", table_cell_style), Paragraph("Dark counts and background noise", table_cell_style)]
     ]
+    if sim.reference_qber is not None:
+        diff_val = abs(sim.qber - sim.reference_qber) * 100.0
+        qber_summary.append([
+            Paragraph("Dataset / Reference QBER", table_cell_style),
+            Paragraph(f"{sim.reference_qber*100.0:.3f} %", table_cell_style),
+            Paragraph("Validation Ground Truth / Benchmark", table_cell_style)
+        ])
+        qber_summary.append([
+            Paragraph("Simulation vs Reference Delta", table_cell_style),
+            Paragraph(f"<b>{diff_val:.3f} %</b>", table_cell_style),
+            Paragraph("Absolute difference (|Sim - Ref|)", table_cell_style)
+        ])
     q_tbl = Table(qber_summary, colWidths=[180, 160, 164])
     q_tbl.setStyle(TableStyle([
         ('BACKGROUND', (0, 0), (-1, 0), accent_blue),

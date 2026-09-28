@@ -30,6 +30,7 @@ from .channel import run_full_quantum_simulation
 from .atmosphere import calculate_dual_link_atmosphere
 from .pointing_error import calculate_pointing_parameters
 from .noise import calculate_detection_probabilities
+from .bb84 import simulate_bb84_protocol
 from .secret_key import calculate_secure_key_rate
 
 
@@ -158,7 +159,7 @@ def run_realistic_quantum_simulation(
         total_trans = 10.0 ** (-adjusted_channel_loss / 10.0)
         sim_result.total_transmittance = total_trans
 
-        # Recompute detection and QBER under adjusted transmittance
+        # Recompute detection probabilities under adjusted transmittance
         det_probs = calculate_detection_probabilities(
             total_channel_transmittance=total_trans,
             mean_photon_number=params.mean_photon_number,
@@ -167,7 +168,27 @@ def run_realistic_quantum_simulation(
             background_noise=params.background_noise,
             optical_error_rate=params.optical_error_rate
         )
-        sim_result.qber = round(det_probs["qber"], 5)
+
+        # Run discrete BB84 protocol simulation under realistic channel loss
+        bb84_res = simulate_bb84_protocol(
+            num_bits=params.num_bits,
+            p_click=det_probs["p_click"],
+            p_signal=det_probs["p_signal"],
+            p_noise=det_probs["p_noise"],
+            optical_error_rate=params.optical_error_rate,
+            channel_loss_db=adjusted_channel_loss,
+            mean_photon_number=params.mean_photon_number,
+            detector_efficiency=params.detector_efficiency,
+            dark_count_rate=params.dark_count_rate,
+            background_noise=params.background_noise,
+            sample_trace_count=35
+        )
+        sim_result.qber = round(bb84_res["simulated_qber"], 5) if bb84_res["sifted_key_length"] > 0 else round(det_probs["qber"], 5)
+        sim_result.sifted_key_length = bb84_res["sifted_key_length"]
+        sim_result.total_detected_photons = bb84_res["total_detected"]
+        sim_result.error_bits = bb84_res["error_bits"]
+        sim_result.detection_rate = round(bb84_res["detection_rate"] * 100.0, 2)
+        sim_result.bit_samples = bb84_res["bit_samples"]
         
         # Secret-key rate under realistic weather & geometry
         skr_res = calculate_secure_key_rate(

@@ -29,7 +29,8 @@ from .qber import (
     generate_loss_vs_distance_curve,
     generate_qber_vs_turbulence_curve,
     generate_qber_vs_pointing_curve,
-    generate_key_rate_vs_conditions_curve
+    generate_key_rate_vs_conditions_curve,
+    generate_qber_vs_loss_curve
 )
 
 
@@ -115,10 +116,15 @@ def run_full_quantum_simulation(
         p_signal=det_probs["p_signal"],
         p_noise=det_probs["p_noise"],
         optical_error_rate=params.optical_error_rate,
+        channel_loss_db=total_channel_loss_db,
+        mean_photon_number=params.mean_photon_number,
+        detector_efficiency=params.detector_efficiency,
+        dark_count_rate=params.dark_count_rate,
+        background_noise=params.background_noise,
         sample_trace_count=35
     )
 
-    # Use simulated QBER if bits were detected; fallback to analytical QBER
+    # Use simulated QBER from quantum measurement & sifting
     actual_qber = (
         bb84_res["simulated_qber"]
         if bb84_res["sifted_key_length"] > 0
@@ -210,6 +216,32 @@ def run_full_quantum_simulation(
         fec_efficiency=params.fec_efficiency
     )
 
+    qber_vs_loss_curve = generate_qber_vs_loss_curve(
+        mean_photon_number=params.mean_photon_number,
+        detector_efficiency=params.detector_efficiency,
+        dark_count_rate=params.dark_count_rate,
+        background_noise=params.background_noise,
+        optical_error_rate=params.optical_error_rate,
+        repetition_rate_hz=params.repetition_rate,
+        fec_efficiency=params.fec_efficiency,
+        num_simulation_pulses=min(5000, max(2000, params.num_bits // 2))
+    )
+
+    quantum_stats = {
+        "num_bits": params.num_bits,
+        "photons_transmitted": params.num_bits,
+        "photons_detected": bb84_res["total_detected"],
+        "detection_rate": bb84_res["detection_rate"],
+        "basis_matched_count": bb84_res["basis_matched_count"],
+        "sifted_key_length": bb84_res["sifted_key_length"],
+        "sifting_ratio": bb84_res["sifted_fraction"],
+        "error_bits": bb84_res["error_bits"],
+        "simulated_qber": actual_qber,
+        "analytical_qber": det_probs["qber"],
+        "qber_std_error": bb84_res.get("qber_std_err", 0.0),
+        "snr_db": det_probs["snr_db"]
+    }
+
     return SimulationResult(
         id=sim_id,
         scenario_id=scenario_id,
@@ -256,5 +288,9 @@ def run_full_quantum_simulation(
         loss_vs_distance_curve=loss_vs_distance_curve,
         qber_vs_turbulence_curve=qber_vs_turbulence_curve,
         qber_vs_pointing_curve=qber_vs_pointing_curve,
-        key_rate_vs_conditions_curve=key_rate_vs_conditions_curve
+        key_rate_vs_conditions_curve=key_rate_vs_conditions_curve,
+        qber_vs_loss_curve=qber_vs_loss_curve,
+
+        # Quantum simulation statistics
+        quantum_simulation_stats=quantum_stats
     )

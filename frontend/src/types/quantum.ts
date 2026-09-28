@@ -116,6 +116,70 @@ export interface KeyRateVsConditionsPoint {
   is_secure: boolean;
 }
 
+export interface QberVsLossPoint {
+  channel_loss_db: number;
+  simulated_qber_percent: number;
+  analytical_qber_percent: number;
+  qber_percent: number;
+  snr_db: number;
+  secret_key_rate_bps: number;
+  is_secure: boolean;
+  sifted_bits: number;
+}
+
+export interface QberComparison {
+  simulated_qber: number;
+  reference_qber: number;
+  absolute_difference: number;
+  relative_difference_percent: number;
+  is_within_tolerance: boolean;
+  status: string;
+}
+
+export interface QuantumSimulationRequest {
+  num_bits: number;
+  channel_loss_db: number;
+  mean_photon_number?: number;
+  detector_efficiency?: number;
+  dark_count_rate?: number;
+  background_noise?: number;
+  optical_error_rate?: number;
+  repetition_rate?: number;
+  fec_efficiency?: number;
+  scintillation_index?: number;
+  pointing_jitter_urad?: number;
+  sample_trace_count?: number;
+  reference_qber?: number;
+}
+
+export interface QuantumSimulationResponse {
+  id: string;
+  timestamp: string;
+  num_bits: number;
+  photons_transmitted: number;
+  photons_detected: number;
+  detection_rate: number;
+  raw_key_length: number;
+  basis_matched_count: number;
+  sifted_key_length: number;
+  sifting_ratio: number;
+  error_bits: number;
+  simulated_qber: number;
+  analytical_qber: number;
+  qber_std_error: number;
+  reference_qber?: number;
+  qber_difference?: number;
+  secret_key_rate: number;
+  secure_key_length: number;
+  is_secure: boolean;
+  security_status_message: string;
+  channel_loss_db: number;
+  snr_db: number;
+  bit_samples: BitTrace[];
+  qber_vs_loss_curve?: QberVsLossPoint[];
+  qber_comparison?: QberComparison;
+}
+
 export interface SimulationResult {
   id: string;
   scenario_id?: string;
@@ -163,6 +227,12 @@ export interface SimulationResult {
   qber_vs_turbulence_curve: QberVsTurbulencePoint[];
   qber_vs_pointing_curve: QberVsPointingPoint[];
   key_rate_vs_conditions_curve: KeyRateVsConditionsPoint[];
+  qber_vs_loss_curve?: QberVsLossPoint[];
+
+  // Quantum simulation validation comparison
+  reference_qber?: number;
+  qber_difference?: number;
+  quantum_simulation_stats?: Record<string, any>;
 }
 
 export interface ScenarioComparisonResponse {

@@ -17,6 +17,7 @@ import { PageId } from '../components/Sidebar';
 
 interface Props {
   parameters: ChannelParameters;
+  onChangeParameters?: (params: ChannelParameters) => void;
   currentResult: SimulationResult | null;
   isSimulating: boolean;
   onRunSimulation: () => Promise<void>;
@@ -41,6 +42,7 @@ const SIMULATION_STEPS = [
 
 export const SimulationPage: React.FC<Props> = ({
   parameters,
+  onChangeParameters,
   currentResult,
   isSimulating,
   onRunSimulation,
@@ -49,6 +51,8 @@ export const SimulationPage: React.FC<Props> = ({
 }) => {
   const [currentStepIndex, setCurrentStepIndex] = useState<number>(0);
   const [progressPercent, setProgressPercent] = useState<number>(0);
+
+  const QUBIT_OPTIONS = [1000, 5000, 10000, 25000, 50000, 100000];
 
   useEffect(() => {
     let interval: any = null;
@@ -91,6 +95,38 @@ export const SimulationPage: React.FC<Props> = ({
             Synthesizes {parameters.num_bits.toLocaleString()} quantum bit transmissions through the configured LEO satellite,
             stratospheric relay, and ground telescope channel, followed by {parameters.monte_carlo_iterations.toLocaleString()} Monte Carlo statistical runs.
           </p>
+
+          {/* Qubit Count Selector (Section 26) */}
+          <div className="mt-4 flex flex-wrap items-center gap-2">
+            <span className="text-xs font-semibold text-slate-600 mr-1 flex items-center gap-1">
+              <Zap className="w-3.5 h-3.5 text-cyan-600" />
+              Qubit Count:
+            </span>
+            {QUBIT_OPTIONS.map((qCount) => {
+              const isSelected = parameters.num_bits === qCount;
+              return (
+                <button
+                  key={qCount}
+                  disabled={isSimulating}
+                  onClick={() => {
+                    if (onChangeParameters) {
+                      onChangeParameters({
+                        ...parameters,
+                        num_bits: qCount
+                      });
+                    }
+                  }}
+                  className={`px-3 py-1 rounded-lg text-xs font-mono font-bold transition-all cursor-pointer ${
+                    isSelected
+                      ? 'bg-cyan-600 text-white shadow-sm ring-2 ring-cyan-600/30'
+                      : 'bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-200'
+                  }`}
+                >
+                  {qCount >= 1000 ? `${qCount / 1000}k` : qCount}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         <div className="flex items-center gap-3">

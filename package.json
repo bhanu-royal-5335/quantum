@@ -2,12 +2,16 @@
   "name": "quantum-communication-prototype",
   "version": "1.0.0",
   "description": "Hierarchical Quantum Optical Communication Simulation & Verification Web Application",
-  "scripts": {
-    "dev": "npm run dev --prefix frontend",
+    "scripts": {
+    "dev": "concurrently \"npm run dev --prefix frontend\" \"npm run backend\"",
     "build": "npm run build --prefix frontend",
     "preview": "npm run preview --prefix frontend",
     "backend": "python -m uvicorn backend.main:app --host 127.0.0.1 --port 8000 --reload",
     "test:backend": "python -m backend.tests.run_tests",
     "test:integration": "python verify_integration.py"
+  },
+
+  "devDependencies": {
+    "concurrently": "^10.0.5"
   }
 }

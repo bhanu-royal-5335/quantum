@@ -9,6 +9,8 @@ import {
   WeatherData,
   RealisticSimulationRequest,
   RealisticSimulationResult,
+  QuantumSimulationRequest,
+  QuantumSimulationResponse,
   MLStatusResponse,
   MLPredictRequest,
   MLPredictResponse
@@ -66,6 +68,22 @@ export async function runSimulation(
   if (!res.ok) {
     const errData = await res.json().catch(() => ({ detail: 'Unknown network error' }));
     throw new Error(errData.detail || 'Simulation execution failed');
+  }
+  return res.json();
+}
+
+export async function runQuantumSimulation(
+  payload: QuantumSimulationRequest
+): Promise<QuantumSimulationResponse> {
+  const res = await fetch(`${API_BASE_URL}/api/simulation/quantum`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({ detail: 'Quantum simulation network error' }));
+    throw new Error(errData.detail || 'Quantum simulation execution failed');
   }
   return res.json();
 }

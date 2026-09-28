@@ -245,3 +245,87 @@ def test_full_channel_simulation_and_reports():
     csv_str = generate_csv_report(sim)
     assert "HIERARCHICAL QUANTUM COMMUNICATION SIMULATION REPORT" in csv_str
     assert "MONTE CARLO STATISTICAL ANALYSIS" in csv_str
+
+
+def test_quantum_state_vectors_and_born_rule():
+    from backend.simulation.quantum_channel import prepare_state_vector
+    from backend.simulation.quantum_measurement import measure_single_qubit
+    
+    s0 = prepare_state_vector(0, 0)
+    s1 = prepare_state_vector(0, 1)
+    sp = prepare_state_vector(1, 0)
+    sm = prepare_state_vector(1, 1)
+    
+    assert math.isclose(np.linalg.norm(s0), 1.0)
+    assert math.isclose(np.linalg.norm(s1), 1.0)
+    assert math.isclose(np.linalg.norm(sp), 1.0)
+    assert math.isclose(np.linalg.norm(sm), 1.0)
+    
+    assert math.isclose(np.dot(s0, s1), 0.0)
+    assert math.isclose(np.dot(sp, sm), 0.0)
+    
+    for _ in range(20):
+        assert measure_single_qubit(s0, bob_basis=0, is_signal=True) == 0
+        assert measure_single_qubit(s1, bob_basis=0, is_signal=True) == 1
+
+
+def test_quantum_noiseless_channel():
+    res = simulate_bb84_protocol(
+        num_bits=5000,
+        channel_loss_db=2.0,
+        optical_error_rate=0.0,
+        dark_count_rate=1e-12,
+        background_noise=1e-12
+    )
+    assert res["sifted_key_length"] > 0
+    assert res["error_bits"] == 0
+    assert res["simulated_qber"] == 0.0
+
+
+def test_quantum_known_error_rate():
+    res = simulate_bb84_protocol(
+        num_bits=20000,
+        channel_loss_db=5.0,
+        optical_error_rate=0.05,
+        dark_count_rate=1e-12,
+        background_noise=1e-12
+    )
+    assert res["sifted_key_length"] > 1000
+    assert 0.035 <= res["simulated_qber"] <= 0.065
+
+
+def test_quantum_high_loss_and_noise_dominance():
+    res = simulate_bb84_protocol(
+        num_bits=10000,
+        channel_loss_db=55.0,
+        optical_error_rate=0.015,
+        dark_count_rate=1e-3,
+        background_noise=1e-3
+    )
+    if res["sifted_key_length"] > 0:
+        assert res["simulated_qber"] > 0.35
+    else:
+        assert res["simulated_qber"] == 0.50
+
+
+def test_quantum_api_simulation_and_comparison():
+    from backend.models.schemas import QuantumSimulationRequest
+    from backend.api.simulation import run_quantum_bb84_simulation
+    
+    req = QuantumSimulationRequest(
+        num_bits=5000,
+        channel_loss_db=18.0,
+        mean_photon_number=0.6,
+        detector_efficiency=0.8,
+        optical_error_rate=0.02,
+        reference_qber=0.025
+    )
+    resp = run_quantum_bb84_simulation(req)
+    assert resp.num_bits == 5000
+    assert resp.photons_detected > 0
+    assert resp.sifted_key_length > 0
+    assert resp.simulated_qber >= 0.0
+    assert resp.qber_comparison is not None
+    assert resp.qber_comparison.reference_qber == 0.025
+    assert len(resp.bit_samples) > 0
+    assert len(resp.qber_vs_loss_curve) > 0

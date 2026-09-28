@@ -14,7 +14,12 @@ from backend.tests.test_simulation import (
     test_bb84_simulation,
     test_binary_entropy_and_secret_key,
     test_monte_carlo,
-    test_full_channel_simulation_and_reports
+    test_full_channel_simulation_and_reports,
+    test_quantum_state_vectors_and_born_rule,
+    test_quantum_noiseless_channel,
+    test_quantum_known_error_rate,
+    test_quantum_high_loss_and_noise_dominance,
+    test_quantum_api_simulation_and_comparison
 )
 
 tests = [
@@ -27,7 +32,12 @@ tests = [
     test_bb84_simulation,
     test_binary_entropy_and_secret_key,
     test_monte_carlo,
-    test_full_channel_simulation_and_reports
+    test_full_channel_simulation_and_reports,
+    test_quantum_state_vectors_and_born_rule,
+    test_quantum_noiseless_channel,
+    test_quantum_known_error_rate,
+    test_quantum_high_loss_and_noise_dominance,
+    test_quantum_api_simulation_and_comparison
 ]
 
 passed = 0

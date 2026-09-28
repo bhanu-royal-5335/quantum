@@ -7,7 +7,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from contextlib import asynccontextmanager
 
-from .database import init_db
+from backend.database import init_db
 from .api.simulation import router as simulation_router
 from .api.scenarios import router as scenarios_router
 from .api.reports import router as reports_router

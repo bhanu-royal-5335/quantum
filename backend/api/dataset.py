@@ -254,6 +254,11 @@ def simulate_from_dataset_record(req: DatasetSimulateRequest) -> RealisticSimula
         custom_weather=weather
     )
 
+    # Attach dataset reference QBER and comparison delta for validation
+    ref_q = rec["simulated_qber_percent"] / 100.0
+    res.simulation_result.reference_qber = round(ref_q, 5)
+    res.simulation_result.qber_difference = round(abs(res.simulation_result.qber - ref_q), 5)
+
     return res
 
 

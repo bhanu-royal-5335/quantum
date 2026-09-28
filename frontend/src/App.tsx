@@ -390,6 +390,7 @@ export const App: React.FC = () => {
               {activePage === 'simulation' && (
                 <SimulationPage
                   parameters={parameters}
+                  onChangeParameters={setParameters}
                   currentResult={currentResult}
                   isSimulating={isSimulating}
                   onRunSimulation={executeSimulation}
