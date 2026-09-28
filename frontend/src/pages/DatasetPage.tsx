@@ -228,7 +228,11 @@ export const DatasetPage: React.FC<Props> = ({
         satellite_norad_id: selectedNoradId,
         use_dataset_location: true
       });
-      setSimulationSuccess(`Simulation complete for Record #${rec.id} (${rec.timestamp})! QBER: ${(res.simulation.qber * 100).toFixed(2)}%, Key Rate: ${Math.round(res.simulation.secret_key_rate).toLocaleString()} bps`);
+      const simQberStr = (res.simulation.qber * 100).toFixed(2);
+      const refQberStr = res.simulation.reference_qber != null ? (res.simulation.reference_qber * 100).toFixed(2) : null;
+      const diffStr = res.simulation.qber_difference != null ? (res.simulation.qber_difference * 100).toFixed(2) : null;
+      const qberSummary = refQberStr ? `Simulated QBER: ${simQberStr}% (Ref: ${refQberStr}%, Δ: ${diffStr}%)` : `Simulated QBER: ${simQberStr}%`;
+      setSimulationSuccess(`BB84 Quantum Simulation complete for Record #${rec.id} (${rec.timestamp})! ${qberSummary}, Key Rate: ${Math.round(res.simulation.secret_key_rate).toLocaleString()} bps`);
       if (onDatasetSimulated) {
         onDatasetSimulated(res);
       }

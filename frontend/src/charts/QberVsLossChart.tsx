@@ -116,11 +116,11 @@ export const QberVsLossChart: React.FC<QberVsLossChartProps> = ({ data }) => {
                 fontSize: '12px',
                 boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)'
               }}
-              formatter={(value: any, name: string) => {
+              formatter={(value: any, name: any) => {
                 if (name === 'simulatedQber') return [`${Number(value).toFixed(3)}%`, 'BB84 Simulated QBER'];
                 if (name === 'analyticalQber') return [`${Number(value).toFixed(3)}%`, 'Analytical QBER'];
                 if (name === 'keyRate') return [`${Number(value).toLocaleString()} bps`, 'Secret Key Rate'];
-                return [value, name];
+                return [value, String(name || '')];
               }}
               labelFormatter={(label) => `Channel Loss: ${label} dB`}
             />
