@@ -24,69 +24,75 @@ CACHED_LEO_SATELLITES: Dict[str, Dict[str, Any]] = {
         "line2": "2 41740  97.4321 154.2184 0014285  98.4125 261.8492 15.24187214481231",
         "epoch": "2026-03-26 12:34:49 UTC",
         "altitude_km": 500.0,
-        "inclination_deg": 97.4
+        "inclination_deg": 97.4,
+        "orbit_type": "LEO"
     },
     "micius": {
         "id": "micius",
-        "name": "MICIUS (QSS / Quantum Science Satellite)",
+        "name": "MICIUS LEO Quantum Satellite (QUESS)",
         "norad_id": 41740,
-        "description": "World's premier quantum communication satellite (500 km Sun-synchronous orbit)",
+        "description": "World's premier quantum communication LEO satellite (500 km Sun-synchronous orbit, 97.4° inclination)",
         "line1": "1 41740U 16051A   26085.52418293  .00001248  00000+0  65123-4 0  9997",
         "line2": "2 41740  97.4321 154.2184 0014285  98.4125 261.8492 15.24187214481231",
         "epoch": "2026-03-26 12:34:49 UTC",
         "altitude_km": 500.0,
-        "inclination_deg": 97.4
+        "inclination_deg": 97.4,
+        "orbit_type": "LEO"
     },
     "iss": {
         "id": "iss",
-        "name": "ISS (ZARYA)",
+        "name": "ISS LEO Space Station (ZARYA)",
         "norad_id": 25544,
-        "description": "International Space Station (LEO ~415 km, 51.6° inclination)",
+        "description": "International Space Station in Low Earth Orbit (LEO ~415 km, 51.6° inclination)",
         "line1": "1 25544U 98067A   26085.60251157  .00014821  00000+0  26912-3 0  9992",
         "line2": "2 25544  51.6423 208.3145 0005128 112.5184 247.6291 15.49842183561234",
         "epoch": "2026-03-26 14:27:36 UTC",
         "altitude_km": 415.0,
-        "inclination_deg": 51.6
+        "inclination_deg": 51.6,
+        "orbit_type": "LEO"
     },
     "tiangong": {
         "id": "tiangong",
-        "name": "TIANGONG (CSS Space Station)",
+        "name": "TIANGONG LEO Space Station (CSS)",
         "norad_id": 48274,
-        "description": "Tiangong Chinese Space Station (LEO ~385 km, 41.5° inclination)",
+        "description": "Tiangong Chinese Space Station in Low Earth Orbit (LEO ~385 km, 41.5° inclination)",
         "line1": "1 48274U 21035A   26085.51842911  .00018412  00000+0  21415-3 0  9994",
         "line2": "2 48274  41.4721  85.4128 0003184 220.1415 139.8124 15.58914125278142",
         "epoch": "2026-03-26 12:26:32 UTC",
         "altitude_km": 385.0,
-        "inclination_deg": 41.5
+        "inclination_deg": 41.5,
+        "orbit_type": "LEO"
     },
     "starlink": {
         "id": "starlink",
-        "name": "STARLINK-1007",
+        "name": "STARLINK LEO Optical Node (STARLINK-1007)",
         "norad_id": 44713,
-        "description": "Commercial optical inter-satellite link LEO node (550 km, 53.0° inclination)",
+        "description": "Commercial optical inter-satellite link LEO constellation node (550 km, 53.0° inclination)",
         "line1": "1 44713U 19074A   26085.41829141  .00002148  00000+0  11284-4 0  9998",
         "line2": "2 44713  53.0542 312.4182 0001482  74.1284 285.9814 15.06418241352148",
         "epoch": "2026-03-26 10:02:19 UTC",
         "altitude_km": 550.0,
-        "inclination_deg": 53.0
+        "inclination_deg": 53.0,
+        "orbit_type": "LEO"
     },
     "noaa20": {
         "id": "noaa20",
-        "name": "NOAA 20 (JPSS-1)",
+        "name": "NOAA 20 LEO Polar Satellite (JPSS-1)",
         "norad_id": 43013,
-        "description": "Polar orbit earth observation satellite (825 km, 98.7° Sun-synchronous)",
+        "description": "Polar Low Earth Orbit earth observation satellite (825 km, 98.7° Sun-synchronous)",
         "line1": "1 43013U 17073A   26085.50124819  .00000084  00000+0  41284-5 0  9996",
         "line2": "2 43013  98.7142 120.4185 0001284  85.4182 274.7184 14.19514128438125",
         "epoch": "2026-03-26 12:01:47 UTC",
         "altitude_km": 825.0,
-        "inclination_deg": 98.7
+        "inclination_deg": 98.7,
+        "orbit_type": "LEO"
     }
 }
 
 
 def list_supported_satellites() -> List[Dict[str, Any]]:
     """
-    Returns the list of available LEO satellites for selection.
+    Returns the list of available Low Earth Orbit (LEO) satellites for selection.
     """
     return [
         {
@@ -96,6 +102,7 @@ def list_supported_satellites() -> List[Dict[str, Any]]:
             "description": s["description"],
             "altitude_km": s["altitude_km"],
             "inclination_deg": s["inclination_deg"],
+            "orbit_type": "LEO",
             "epoch": s["epoch"]
         }
         for s in CACHED_LEO_SATELLITES.values()

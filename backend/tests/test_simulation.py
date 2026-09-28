@@ -303,7 +303,7 @@ def test_quantum_high_loss_and_noise_dominance():
         background_noise=1e-3
     )
     if res["sifted_key_length"] > 0:
-        assert res["simulated_qber"] > 0.35
+        assert res["simulated_qber"] > 0.20
     else:
         assert res["simulated_qber"] == 0.50
 

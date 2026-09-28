@@ -115,8 +115,8 @@ export const ComparePage: React.FC<Props> = ({ scenarios, onNavigate, realisticR
   const alternativeScenarios = [
     {
       id: 'clear',
-      name: 'Scenario A: Micius @ 42.5° El (Clear Sky)',
-      satellite: 'Micius (QUESS 41740)',
+      name: 'Scenario A: Micius LEO @ 42.5° El (Clear Sky)',
+      satellite: 'Micius LEO (QUESS 41740)',
       elevation: '42.5°',
       range: '682.3 km',
       visibility: '20.0 km',
@@ -127,8 +127,8 @@ export const ComparePage: React.FC<Props> = ({ scenarios, onNavigate, realisticR
     },
     {
       id: 'fog',
-      name: 'Scenario B: Micius @ 42.5° El (Overcast Fog, Vis 5 km)',
-      satellite: 'Micius (QUESS 41740)',
+      name: 'Scenario B: Micius LEO @ 42.5° El (Overcast Fog, Vis 5 km)',
+      satellite: 'Micius LEO (QUESS 41740)',
       elevation: '42.5°',
       range: '682.3 km',
       visibility: '5.0 km (Heavy Aerosol)',
@@ -139,8 +139,8 @@ export const ComparePage: React.FC<Props> = ({ scenarios, onNavigate, realisticR
     },
     {
       id: 'iss',
-      name: 'Scenario C: ISS @ 14.2° El (Low Horizon Slant)',
-      satellite: 'ISS (ZARYA 25544)',
+      name: 'Scenario C: ISS LEO @ 14.2° El (Low Horizon Slant)',
+      satellite: 'ISS LEO (ZARYA 25544)',
       elevation: '14.2°',
       range: '1,248.5 km',
       visibility: '18.0 km',
@@ -398,7 +398,7 @@ export const ComparePage: React.FC<Props> = ({ scenarios, onNavigate, realisticR
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   <tr className="hover:bg-slate-50/50">
-                    <td className="py-3 px-4 font-semibold text-slate-800">Satellite</td>
+                    <td className="py-3 px-4 font-semibold text-slate-800">LEO Satellite</td>
                     <td className="py-3 px-4 text-right font-mono text-slate-600">{standardBaseline.satellite}</td>
                     <td className="py-3 px-4 text-right font-mono font-bold text-sky-800">{realisticCalculated.satellite}</td>
                     <td className="py-3 px-4 text-right text-slate-500 text-[11px]">Live NORAD TLE Ephemeris</td>
@@ -455,7 +455,7 @@ export const ComparePage: React.FC<Props> = ({ scenarios, onNavigate, realisticR
             <div className="border-b border-slate-100 pb-3 mb-4">
               <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                 <CloudSun className="w-4 h-4 text-amber-500" />
-                Comparison of Different Realistic Satellite & Weather Regimes
+                Comparison of Different Realistic LEO Satellite & Weather Regimes
               </h3>
               <p className="text-xs text-slate-500 mt-0.5">
                 Demonstrates how elevation angle degradation and adverse meteorological conditions affect the link budget
@@ -467,7 +467,7 @@ export const ComparePage: React.FC<Props> = ({ scenarios, onNavigate, realisticR
                 <thead>
                   <tr className="border-b border-slate-200 text-slate-700 bg-slate-50">
                     <th className="py-2.5 px-3 font-semibold">Scenario Profile</th>
-                    <th className="py-2.5 px-3 font-semibold">Satellite</th>
+                    <th className="py-2.5 px-3 font-semibold">LEO Satellite</th>
                     <th className="py-2.5 px-3 font-semibold">Elevation</th>
                     <th className="py-2.5 px-3 font-semibold">Range</th>
                     <th className="py-2.5 px-3 font-semibold">Visibility</th>

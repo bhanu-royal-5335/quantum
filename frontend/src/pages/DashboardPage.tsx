@@ -131,8 +131,8 @@ export const DashboardPage: React.FC<Props> = ({
             Simulate and verify free-space quantum key distribution (BB84 protocol) across dual-hop optical channels:
             <span className="font-semibold text-cyan-300 ml-1">Alice (Source) → LEO Satellite → Stratospheric HAP Relay → Bob (Ground Receiver)</span>.
             {isRealistic
-              ? ' Live CelesTrak TLE ephemeris, Skyfield perturbation dynamics, and Open-Meteo atmospheric attenuation directly govern optical channel loss, QBER, and secret-key generation rate.'
-              : ' Evaluate atmospheric attenuation, turbulent scintillation, pointing jitter, single-photon detection, and information-theoretic security bounds.'}
+              ? ' Live CelesTrak LEO satellite ephemerides (14,120 LEO satellites), Skyfield perturbation dynamics, and NASA POWER / Open-Meteo atmospheric attenuation directly govern optical channel loss, QBER, and secret-key generation rate.'
+              : ' Evaluate atmospheric attenuation, turbulent scintillation, pointing jitter, single-photon detection, and information-theoretic security bounds for Low Earth Orbit (LEO) satellites.'}
           </p>
 
           <div className="flex flex-wrap items-center gap-3">

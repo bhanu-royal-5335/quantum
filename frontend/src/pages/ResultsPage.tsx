@@ -131,9 +131,9 @@ export const ResultsPage: React.FC<Props> = ({ result, realisticResult, onNaviga
         </div>
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-2.5 text-[11px]">
           <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
-            <span className="text-slate-400 block text-[9px] uppercase font-bold">Satellite Position</span>
+            <span className="text-slate-400 block text-[9px] uppercase font-bold">LEO Satellite Position</span>
             <strong className="text-slate-800 block truncate">Skyfield SGP4</strong>
-            <span className="text-[9px] text-teal-700 font-bold block mt-0.5">Tier 3: CelesTrak TLE</span>
+            <span className="text-[9px] text-teal-700 font-bold block mt-0.5">Tier 3: CelesTrak LEO TLE</span>
           </div>
           <div className="p-2.5 rounded-lg bg-slate-50 border border-slate-100">
             <span className="text-slate-400 block text-[9px] uppercase font-bold">Visibility / Dew Pt</span>
@@ -177,17 +177,17 @@ export const ResultsPage: React.FC<Props> = ({ result, realisticResult, onNaviga
             <div>
               <h2 className="text-base font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                 <Satellite className="w-5 h-5 text-sky-600" />
-                REALISTIC SCENARIO RESULTS (CelesTrak + Skyfield + Weather)
+                REALISTIC LEO SATELLITE RESULTS (CelesTrak LEO + Skyfield + Weather)
               </h2>
               <p className="text-xs text-slate-500 mt-0.5">
-                Physical parameters derived from live orbital mechanics, slant range geometry, and meteorological atmospheric loss
+                Physical parameters derived from live LEO orbital mechanics, slant range geometry, and meteorological atmospheric loss
               </p>
             </div>
             <div className="flex items-center gap-2">
               <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
                 r.satellite_info.is_live ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
               }`}>
-                {r.satellite_info.is_live ? '● LIVE CELESTRAK' : '● DEMO / CACHED TLE'}
+                {r.satellite_info.is_live ? '● LIVE CELESTRAK LEO' : '● DEMO / CACHED LEO TLE'}
               </span>
               <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${
                 r.weather.is_live ? 'bg-emerald-50 text-emerald-700 border border-emerald-200' : 'bg-amber-50 text-amber-700 border border-amber-200'
@@ -204,7 +204,7 @@ export const ResultsPage: React.FC<Props> = ({ result, realisticResult, onNaviga
             <div className="p-4 rounded-lg bg-sky-50/60 border border-sky-100">
               <h3 className="text-xs font-bold text-sky-900 uppercase tracking-wide flex items-center gap-1.5 mb-2.5">
                 <Satellite className="w-4 h-4 text-sky-600" />
-                Satellite Ephemeris
+                LEO Satellite Ephemeris
               </h3>
               <div className="space-y-1.5 text-xs">
                 <div className="flex justify-between">
@@ -354,16 +354,16 @@ export const ResultsPage: React.FC<Props> = ({ result, realisticResult, onNaviga
               <div className="flex items-center justify-between">
                 <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
                   <BarChart3 className="w-4 h-4 text-sky-600" />
-                  Realistic Satellite Pass Simulation Curves (Skyfield Ephemeris)
+                  Realistic LEO Satellite Pass Simulation Curves (Skyfield Ephemeris)
                 </h3>
                 <span className="text-xs text-slate-400">
-                  {r.trajectory.length} trajectory pass steps evaluated
+                  {r.trajectory.length} LEO pass steps evaluated
                 </span>
               </div>
 
               {/* Grid for Charts 1, 2, 3, 4 */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                {/* Chart 1: Satellite Elevation vs Time */}
+                {/* Chart 1: LEO Satellite Elevation vs Time */}
                 <ElevationVsTimeChart data={r.trajectory} minElevationDeg={10.0} />
 
                 {/* Chart 2: Slant Range vs Time */}

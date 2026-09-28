@@ -75,7 +75,7 @@ export const SatellitePositionCard: React.FC<Props> = ({
           <div className="flex items-center gap-2">
             <h3 className="text-sm font-bold text-slate-900 uppercase tracking-wider flex items-center gap-2">
               <Satellite className="w-4 h-4 text-sky-600" />
-              Realistic Satellite Data & Propagation (CelesTrak + Skyfield)
+              Realistic LEO Satellite Data & Propagation (CelesTrak + Skyfield)
             </h3>
             {/* Live Data Badge */}
             <span
@@ -86,11 +86,11 @@ export const SatellitePositionCard: React.FC<Props> = ({
               }`}
             >
               <span className={`w-1.5 h-1.5 rounded-full ${isLive ? 'bg-emerald-500' : 'bg-amber-500'}`} />
-              {isLive ? 'LIVE DATA (CelesTrak)' : 'DEMO / CACHED DATA'}
+              {isLive ? 'LIVE DATA (CelesTrak LEO)' : 'DEMO / CACHED LEO'}
             </span>
           </div>
           <p className="text-xs text-slate-500 mt-0.5">
-            Orbital ephemeris propagated in real time via Skyfield SGP4 mechanics to ground station {groundStation.name}
+            LEO orbital ephemeris propagated in real time via Skyfield SGP4 mechanics to ground station {groundStation.name}
           </p>
         </div>
 
@@ -100,7 +100,7 @@ export const SatellitePositionCard: React.FC<Props> = ({
           className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold bg-sky-50 hover:bg-sky-100 text-sky-700 border border-sky-200 transition-colors disabled:opacity-50 cursor-pointer self-start sm:self-auto"
         >
           <RefreshCw className={`w-3.5 h-3.5 ${isRefreshing ? 'animate-spin' : ''}`} />
-          <span>Refresh Satellite Position</span>
+          <span>Refresh LEO Position</span>
         </button>
       </div>
 
@@ -108,17 +108,17 @@ export const SatellitePositionCard: React.FC<Props> = ({
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 bg-slate-50 p-3.5 rounded-lg border border-slate-200 text-xs">
         <div>
           <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-            Satellite Source
+            Satellite Orbit Source
           </label>
           <div className="px-3 py-1.5 bg-white rounded border border-slate-300 font-mono text-xs font-medium text-slate-800 flex items-center justify-between">
-            <span>CelesTrak (NORAD)</span>
+            <span>CelesTrak LEO (NORAD)</span>
             <span className="text-[10px] text-emerald-600 font-bold">ACTIVE</span>
           </div>
         </div>
 
         <div>
           <label className="text-[11px] font-semibold text-slate-600 block mb-1">
-            Satellite Selection
+            LEO Satellite Selection
           </label>
           <select
             value={selectedNoradId}
@@ -164,10 +164,10 @@ export const SatellitePositionCard: React.FC<Props> = ({
           <div className="flex items-center justify-between mb-3 pb-2 border-b border-slate-200">
             <h4 className="text-xs font-bold text-slate-800 uppercase tracking-wide flex items-center gap-1.5">
               <Globe className="w-3.5 h-3.5 text-sky-600" />
-              Real-Time / Realistic Satellite Position
+              Real-Time LEO Satellite Position
             </h4>
             <span className="text-[10px] font-mono text-slate-400">
-              Skyfield Propagation
+              Skyfield LEO Propagation
             </span>
           </div>
 

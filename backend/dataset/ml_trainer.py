@@ -3,8 +3,8 @@ import math
 import pickle
 import numpy as np
 from typing import Dict, List, Any, Optional, Tuple
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor, RandomForestClassifier
-from sklearn.model_selection import train_test_split, cross_val_score
+from sklearn.ensemble import RandomForestRegressor, RandomForestClassifier
+from sklearn.model_selection import train_test_split
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, accuracy_score
 
 from .processor import dataset_processor
@@ -14,6 +14,14 @@ MODEL_CACHE_FILE = os.path.abspath(
 )
 
 FEATURE_NAMES = [
+    # CelesTrak LEO Satellite Orbital Features
+    "satellite_altitude_km",
+    "elevation_deg",
+    "slant_range_km",
+    "inclination_deg",
+    "mean_motion_rev_per_day",
+    "airmass_factor",
+    # NASA POWER MERRA-2 Meteorological Features
     "temperature_c",
     "dew_point_c",
     "relative_humidity_percent",
@@ -27,6 +35,12 @@ FEATURE_NAMES = [
 ]
 
 FEATURE_LABELS = {
+    "satellite_altitude_km": "LEO Satellite Altitude (km)",
+    "elevation_deg": "Ground Elevation Look Angle (°)",
+    "slant_range_km": "LEO Optical Slant Range (km)",
+    "inclination_deg": "LEO Orbital Inclination (°)",
+    "mean_motion_rev_per_day": "LEO Mean Motion (rev/day)",
+    "airmass_factor": "Atmospheric Airmass Path Factor",
     "temperature_c": "Temperature (°C)",
     "dew_point_c": "Dew Point (°C)",
     "relative_humidity_percent": "Relative Humidity (%)",
@@ -42,8 +56,9 @@ FEATURE_LABELS = {
 
 class QuantumQKDMLTrainer:
     """
-    Supervised Machine Learning module trained directly on NASA POWER MERRA-2
-    meteorological dataset (8,760 continuous hourly observations).
+    Supervised Machine Learning module trained directly on:
+    1. NASA POWER MERRA-2 meteorological dataset (8,760 continuous hourly observations)
+    2. CelesTrak LEO Satellite orbital ephemeris dataset (14,120 Low Earth Orbit satellites)
     
     Predicts:
     1. Total Optical Channel Loss (dB)
@@ -62,33 +77,63 @@ class QuantumQKDMLTrainer:
         self._try_load_cached_model()
 
     def _extract_feature_matrix(self) -> Tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
-        """Extracts numerical feature matrix X and targets Y from the 8,760 dataset records."""
-        records = dataset_processor.records
+        """Extracts numerical feature matrix X and targets Y from paired CelesTrak LEO passes + NASA weather."""
+        passes = dataset_processor.paired_leo_passes
+        if not passes:
+            # Fallback if paired passes not ready
+            passes = dataset_processor.records
+
         X = []
         y_loss = []
         y_qber = []
         y_skr = []
         y_sec = []
 
-        for r in records:
-            dp_depression = max(0.0, r["temperature_c"] - r["dew_point_c"])
+        earth_r = 6371.0
+
+        for p in passes:
+            t2m = float(p.get("temperature_c", 25.0))
+            t2mdew = float(p.get("dew_point_c", 16.0))
+            dp_depression = max(0.0, t2m - t2mdew)
+
+            h = float(p.get("satellite_altitude_km", 500.0))
+            el_deg = float(p.get("elevation_deg", 45.0))
+            el_rad = math.radians(el_deg)
+
+            if "slant_range_km" in p:
+                d_slant = float(p["slant_range_km"])
+            else:
+                term = (earth_r * math.sin(el_rad)) ** 2 + 2.0 * earth_r * h + (h ** 2)
+                d_slant = math.sqrt(max(1.0, term)) - earth_r * math.sin(el_rad)
+
+            if "airmass_factor" in p:
+                airmass = float(p["airmass_factor"])
+            else:
+                airmass = 1.0 / max(0.05, math.sin(el_rad) + 0.00186 * ((el_deg + 3.8) ** -1.253))
+
             feat = [
-                r["temperature_c"],
-                r["dew_point_c"],
-                r["relative_humidity_percent"],
-                r["surface_pressure_kpa"],
-                r["wind_speed_ms"],
-                r["wind_direction_deg"],
-                r["precipitation_mmh"],
+                h,
+                el_deg,
+                d_slant,
+                float(p.get("inclination_deg", 53.0)),
+                float(p.get("mean_motion_rev_per_day", 15.0)),
+                airmass,
+                t2m,
+                t2mdew,
+                float(p.get("relative_humidity_percent", 50.0)),
+                float(p.get("surface_pressure_kpa", 95.0)),
+                float(p.get("wind_speed_ms", 3.0)),
+                float(p.get("wind_direction_deg", 90.0)),
+                float(p.get("precipitation_mmh", 0.0)),
                 dp_depression,
-                r["hour"],
-                r["month"]
+                float(p.get("hour", 12)),
+                float(p.get("month", 6))
             ]
             X.append(feat)
-            y_loss.append(r["simulated_channel_loss_db"])
-            y_qber.append(r["simulated_qber_percent"])
-            y_skr.append(r["simulated_skr_bps"])
-            y_sec.append(1 if r["is_secure"] else 0)
+            y_loss.append(p.get("simulated_channel_loss_db", 30.0))
+            y_qber.append(p.get("simulated_qber_percent", 1.8))
+            y_skr.append(p.get("simulated_skr_bps", 1500.0))
+            y_sec.append(1 if p.get("is_secure", True) else 0)
 
         return (
             np.array(X, dtype=np.float32),
@@ -100,37 +145,37 @@ class QuantumQKDMLTrainer:
 
     def train_models(self, test_size: float = 0.20, random_state: int = 42) -> Dict[str, Any]:
         """
-        Trains Random Forest Regressors and Classifiers on the 8,760 hours dataset.
-        Computes train/test R^2, MAE, RMSE, cross-validation, and feature importances.
+        Trains Random Forest Regressors and Classifiers on the joined CelesTrak LEO + NASA POWER dataset.
+        Computes train/test R^2, MAE, RMSE, and multi-source feature importances.
         """
         X, y_loss, y_qber, y_skr, y_sec = self._extract_feature_matrix()
 
-        # Split into 80% train (7,008 hours), 20% test (1,752 hours)
+        # Split into 80% train, 20% test
         X_train, X_test, y_loss_train, y_loss_test = train_test_split(X, y_loss, test_size=test_size, random_state=random_state)
         _, _, y_qber_train, y_qber_test = train_test_split(X, y_qber, test_size=test_size, random_state=random_state)
         _, _, y_skr_train, y_skr_test = train_test_split(X, y_skr, test_size=test_size, random_state=random_state)
         _, _, y_sec_train, y_sec_test = train_test_split(X, y_sec, test_size=test_size, random_state=random_state)
 
-        # 1. Channel Loss Model
-        self.loss_model = RandomForestRegressor(n_estimators=100, max_depth=12, random_state=random_state, n_jobs=-1)
+        # 1. Channel Loss Model (driven by LEO geometric path loss + atmospheric airmass extinction)
+        self.loss_model = RandomForestRegressor(n_estimators=70, max_depth=14, random_state=random_state, n_jobs=-1)
         self.loss_model.fit(X_train, y_loss_train)
         pred_loss_test = self.loss_model.predict(X_test)
         pred_loss_train = self.loss_model.predict(X_train)
 
         # 2. QBER Model
-        self.qber_model = RandomForestRegressor(n_estimators=100, max_depth=12, random_state=random_state, n_jobs=-1)
+        self.qber_model = RandomForestRegressor(n_estimators=70, max_depth=14, random_state=random_state, n_jobs=-1)
         self.qber_model.fit(X_train, y_qber_train)
         pred_qber_test = self.qber_model.predict(X_test)
         pred_qber_train = self.qber_model.predict(X_train)
 
         # 3. Secret Key Rate Model
-        self.skr_model = RandomForestRegressor(n_estimators=100, max_depth=12, random_state=random_state, n_jobs=-1)
+        self.skr_model = RandomForestRegressor(n_estimators=70, max_depth=14, random_state=random_state, n_jobs=-1)
         self.skr_model.fit(X_train, y_skr_train)
         pred_skr_test = self.skr_model.predict(X_test)
         pred_skr_train = self.skr_model.predict(X_train)
 
         # 4. Security Classifier
-        self.security_classifier = RandomForestClassifier(n_estimators=80, max_depth=10, random_state=random_state, n_jobs=-1)
+        self.security_classifier = RandomForestClassifier(n_estimators=60, max_depth=12, random_state=random_state, n_jobs=-1)
         self.security_classifier.fit(X_train, y_sec_train)
         pred_sec_test = self.security_classifier.predict(X_test)
 
@@ -144,6 +189,7 @@ class QuantumQKDMLTrainer:
             feature_ranking.append({
                 "feature": name,
                 "label": FEATURE_LABELS[name],
+                "category": "LEO Satellite Orbital Parameter" if i < 6 else "NASA POWER Meteorological Parameter",
                 "importance_loss": round(float(loss_importances[i]), 4),
                 "importance_qber": round(float(qber_importances[i]), 4),
                 "importance_composite": round(float(avg_imp), 4),
@@ -153,11 +199,23 @@ class QuantumQKDMLTrainer:
         feature_ranking.sort(key=lambda x: x["importance_composite"], reverse=True)
 
         self.training_summary = {
-            "dataset_file": dataset_processor.metadata.get("filename", ""),
+            "dataset_sources": [
+                {
+                    "name": "NASA POWER MERRA-2 Hourly Meteorological Dataset",
+                    "file": dataset_processor.metadata.get("filename", "POWER_Point_Hourly_20250101_20251231_014d00N_078d00E_LST.csv"),
+                    "records": len(dataset_processor.records)
+                },
+                {
+                    "name": "CelesTrak LEO Satellite Orbital Ephemeris Dataset",
+                    "file": dataset_processor.celestrak_metadata.get("filename", "celestrak_satellite_dataset_3-April-2026.csv"),
+                    "records": dataset_processor.celestrak_metadata.get("leo_satellites_count", 14120),
+                    "orbit_focus": "LEO Satellites (160 - 2,000 km altitude)"
+                }
+            ],
             "total_samples": len(X),
             "train_samples": len(X_train),
             "test_samples": len(X_test),
-            "algorithm": "Random Forest Regressor & Classifier Ensemble (100 Trees, Depth 12)",
+            "algorithm": "Random Forest Regressor & Classifier Ensemble (70 Trees, Depth 14)",
             "metrics": {
                 "channel_loss": {
                     "train_r2": round(float(r2_score(y_loss_train, pred_loss_train)), 4),
@@ -189,25 +247,47 @@ class QuantumQKDMLTrainer:
         self._cache_model()
         return self.training_summary
 
-    def predict(self, weather_input: Dict[str, Any]) -> Dict[str, Any]:
+    def predict(self, model_input: Dict[str, Any]) -> Dict[str, Any]:
         """
-        Runs ML inference using the trained Random Forest models on given weather parameters.
+        Runs ML inference using the trained Random Forest models on given LEO satellite & weather parameters.
         """
         if not self.is_trained:
             self.train_models()
 
-        t2m = float(weather_input.get("temperature_c", 25.0))
-        t2mdew = float(weather_input.get("dew_point_c", t2m - 5.0))
-        rh2m = float(weather_input.get("relative_humidity_percent", 50.0))
-        ps = float(weather_input.get("surface_pressure_kpa", 95.0))
-        ws = float(weather_input.get("wind_speed_ms", 3.0))
-        wd = float(weather_input.get("wind_direction_deg", 90.0))
-        precip = float(weather_input.get("precipitation_mmh", 0.0))
-        hour = int(weather_input.get("hour", 12))
-        month = int(weather_input.get("month", 6))
+        # CelesTrak LEO Satellite features
+        alt = float(model_input.get("satellite_altitude_km", 500.0))
+        el_deg = float(model_input.get("elevation_deg", 45.0))
+        el_rad = math.radians(el_deg)
+        earth_r = 6371.0
+
+        if "slant_range_km" in model_input and model_input["slant_range_km"] is not None:
+            d_slant = float(model_input["slant_range_km"])
+        else:
+            term = (earth_r * math.sin(el_rad)) ** 2 + 2.0 * earth_r * alt + (alt ** 2)
+            d_slant = math.sqrt(max(1.0, term)) - earth_r * math.sin(el_rad)
+
+        inc = float(model_input.get("inclination_deg", 97.4))
+        mm = float(model_input.get("mean_motion_rev_per_day", 15.24))
+
+        if "airmass_factor" in model_input and model_input["airmass_factor"] is not None:
+            airmass = float(model_input["airmass_factor"])
+        else:
+            airmass = 1.0 / max(0.05, math.sin(el_rad) + 0.00186 * ((el_deg + 3.8) ** -1.253))
+
+        # NASA POWER Meteorological features
+        t2m = float(model_input.get("temperature_c", 25.0))
+        t2mdew = float(model_input.get("dew_point_c", t2m - 5.0))
+        rh2m = float(model_input.get("relative_humidity_percent", 50.0))
+        ps = float(model_input.get("surface_pressure_kpa", 95.0))
+        ws = float(model_input.get("wind_speed_ms", 3.0))
+        wd = float(model_input.get("wind_direction_deg", 90.0))
+        precip = float(model_input.get("precipitation_mmh", 0.0))
+        hour = int(model_input.get("hour", 12))
+        month = int(model_input.get("month", 6))
         dp_depression = max(0.0, t2m - t2mdew)
 
         features = np.array([[
+            alt, el_deg, d_slant, inc, mm, airmass,
             t2m, t2mdew, rh2m, ps, ws, wd, precip, dp_depression, hour, month
         ]], dtype=np.float32)
 
@@ -221,7 +301,15 @@ class QuantumQKDMLTrainer:
             "predicted_qber_percent": round(pred_qber, 3),
             "predicted_skr_bps": round(max(0.0, pred_skr), 1),
             "is_secure": pred_sec and pred_qber < 11.0,
-            "model_provenance": "Trained Machine Learning Model (Random Forest on NASA POWER MERRA-2)"
+            "model_provenance": "Trained Multi-Source ML Model (Random Forest on NASA POWER MERRA-2 + CelesTrak LEO Satellite Dataset)",
+            "leo_satellite_parameters": {
+                "altitude_km": round(alt, 1),
+                "elevation_deg": round(el_deg, 1),
+                "slant_range_km": round(d_slant, 1),
+                "airmass_factor": round(airmass, 2),
+                "inclination_deg": round(inc, 1),
+                "orbit_type": "LEO"
+            }
         }
 
     def _cache_model(self):
@@ -234,23 +322,25 @@ class QuantumQKDMLTrainer:
                     "qber_model": self.qber_model,
                     "skr_model": self.skr_model,
                     "security_classifier": self.security_classifier,
-                    "training_summary": self.training_summary
+                    "training_summary": self.training_summary,
+                    "features_count": len(FEATURE_NAMES)
                 }, f)
         except Exception as e:
             print(f"Warning: Failed to cache ML models: {e}")
 
     def _try_load_cached_model(self):
-        """Attempts to load cached model checkpoints from disk."""
+        """Attempts to load cached model checkpoints from disk if matching the 16 features."""
         if os.path.exists(MODEL_CACHE_FILE):
             try:
                 with open(MODEL_CACHE_FILE, 'rb') as f:
                     data = pickle.load(f)
-                    self.loss_model = data.get("loss_model")
-                    self.qber_model = data.get("qber_model")
-                    self.skr_model = data.get("skr_model")
-                    self.security_classifier = data.get("security_classifier")
-                    self.training_summary = data.get("training_summary")
-                    self.is_trained = True
+                    if data.get("features_count") == len(FEATURE_NAMES) and getattr(data.get("loss_model"), "n_features_in_", 0) == len(FEATURE_NAMES):
+                        self.loss_model = data.get("loss_model")
+                        self.qber_model = data.get("qber_model")
+                        self.skr_model = data.get("skr_model")
+                        self.security_classifier = data.get("security_classifier")
+                        self.training_summary = data.get("training_summary")
+                        self.is_trained = True
             except Exception:
                 pass
 

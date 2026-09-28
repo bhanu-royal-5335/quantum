@@ -401,6 +401,39 @@ export interface DatasetStatistics {
   derived_visibility_km: { mean: number; min: number; max: number };
 }
 
+export interface CelestrakLeoSatellite {
+  id: number;
+  name: string;
+  epoch: string;
+  inclination_deg: number;
+  raan_deg: number;
+  eccentricity: number;
+  arg_perigee_deg: number;
+  mean_anomaly_deg: number;
+  mean_motion_rev_per_day: number;
+  altitude_km: number;
+  orbit_type: string;
+  orbital_period_min: number;
+  regime: string;
+  zenith_loss_db: number;
+}
+
+export interface CelestrakLeoOverview {
+  source: string;
+  filename: string;
+  total_satellites_raw: number;
+  leo_satellites_count: number;
+  orbit_filter: string;
+  mean_altitude_km: number;
+  min_altitude_km: number;
+  max_altitude_km: number;
+  mean_inclination_deg: number;
+  mean_motion_rev_per_day: number;
+  mean_orbital_period_min: number;
+  regime_counts: Record<string, number>;
+  key_constellations: Record<string, number>;
+}
+
 export interface DatasetOverview {
   metadata: DatasetMetadata;
   columns: Record<string, ColumnDefinition>;
@@ -408,6 +441,12 @@ export interface DatasetOverview {
   statistics: DatasetStatistics;
   audit_log?: { step: string; action: string }[];
   unit_conversions?: { parameter: string; raw_unit: string; target_unit: string; formula: string }[];
+  celestrak_leo?: {
+    metadata: CelestrakLeoOverview;
+    sample_satellites: CelestrakLeoSatellite[];
+    total_leo_satellites: number;
+    paired_passes_count: number;
+  };
 }
 
 export interface DatasetRecord {
@@ -617,6 +656,7 @@ export interface DatasetSimulateRequest {
 export interface MLFeatureRanking {
   feature: string;
   label: string;
+  category?: string;
   importance_loss: number;
   importance_qber: number;
   importance_composite: number;
@@ -648,7 +688,13 @@ export interface MLModelMetrics {
 }
 
 export interface MLStatusResponse {
-  dataset_file: string;
+  dataset_file?: string;
+  dataset_sources?: Array<{
+    name: string;
+    file: string;
+    records: number;
+    orbit_focus?: string;
+  }>;
   total_samples: number;
   train_samples: number;
   test_samples: number;
@@ -659,6 +705,14 @@ export interface MLStatusResponse {
 }
 
 export interface MLPredictRequest {
+  // CelesTrak LEO Satellite Orbital Features
+  satellite_altitude_km?: number;
+  elevation_deg?: number;
+  slant_range_km?: number;
+  inclination_deg?: number;
+  mean_motion_rev_per_day?: number;
+  satellite_name?: string;
+  // NASA POWER Meteorological Features
   temperature_c: number;
   dew_point_c: number;
   relative_humidity_percent: number;
@@ -688,6 +742,14 @@ export interface MLPredictResponse {
     predicted_skr_bps: number;
     is_secure: boolean;
     model_provenance: string;
+    leo_satellite_parameters?: {
+      altitude_km: number;
+      elevation_deg: number;
+      slant_range_km: number;
+      airmass_factor: number;
+      inclination_deg: number;
+      orbit_type: string;
+    };
   };
   physics_comparison?: MLPhysicsComparison | null;
 }

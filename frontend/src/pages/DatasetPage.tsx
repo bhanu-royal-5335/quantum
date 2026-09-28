@@ -62,7 +62,9 @@ import {
   DatasetMapping,
   MLStatusResponse,
   MLPredictRequest,
-  MLPredictResponse
+  MLPredictResponse,
+  CelestrakLeoOverview,
+  CelestrakLeoSatellite
 } from '../types/quantum';
 import {
   fetchDatasetOverview,
@@ -75,7 +77,9 @@ import {
   getDatasetCsvExportUrl,
   fetchMLStatus,
   trainMLModels,
-  predictWithML
+  predictWithML,
+  fetchCelestrakLeoOverview,
+  fetchCelestrakLeoSatellites
 } from '../services/api';
 import { PageId } from '../components/Sidebar';
 
@@ -90,7 +94,7 @@ export const DatasetPage: React.FC<Props> = ({
   onApplyDatasetCondition,
   onDatasetSimulated
 }) => {
-  const [activeTab, setActiveTab] = useState<'browser' | 'analytics' | 'validation' | 'ml' | 'mapping' | 'catalog'>('browser');
+  const [activeTab, setActiveTab] = useState<'browser' | 'celestrak' | 'analytics' | 'validation' | 'ml' | 'mapping' | 'catalog'>('browser');
   const [overview, setOverview] = useState<DatasetOverview | null>(null);
   const [analytics, setAnalytics] = useState<DatasetAnalyticsResponse | null>(null);
   const [validation, setValidation] = useState<DatasetValidationMetrics | null>(null);
@@ -102,11 +106,26 @@ export const DatasetPage: React.FC<Props> = ({
   const [simulatingRecordId, setSimulatingRecordId] = useState<number | null>(null);
   const [simulationSuccess, setSimulationSuccess] = useState<string | null>(null);
 
+  // CelesTrak LEO Satellites State
+  const [celestrakOverview, setCelestrakOverview] = useState<CelestrakLeoOverview | null>(null);
+  const [celestrakSatellites, setCelestrakSatellites] = useState<CelestrakLeoSatellite[]>([]);
+  const [celestrakTotalMatching, setCelestrakTotalMatching] = useState<number>(14120);
+  const [celestrakLoading, setCelestrakLoading] = useState<boolean>(false);
+  const [celestrakSearch, setCelestrakSearch] = useState<string>('');
+  const [celestrakRegime, setCelestrakRegime] = useState<string>('All');
+  const [celestrakPage, setCelestrakPage] = useState<number>(1);
+  const celestrakPageSize = 25;
+
   // Machine Learning Model State
   const [mlStatus, setMlStatus] = useState<MLStatusResponse | null>(null);
   const [mlTraining, setMlTraining] = useState<boolean>(false);
   const [mlTrainSuccess, setMlTrainSuccess] = useState<string | null>(null);
   const [mlPredictInput, setMlPredictInput] = useState<MLPredictRequest>({
+    satellite_altitude_km: 500.0,
+    elevation_deg: 45.0,
+    inclination_deg: 97.4,
+    mean_motion_rev_per_day: 15.24,
+    satellite_name: 'Micius LEO Satellite (NORAD 41740)',
     temperature_c: 25.0,
     dew_point_c: 16.0,
     relative_humidity_percent: 58.0,
@@ -160,17 +179,35 @@ export const DatasetPage: React.FC<Props> = ({
       handleRunMLInference(mlPredictInput);
     }, 280);
     return () => clearTimeout(timer);
-  }, [mlPredictInput.temperature_c, mlPredictInput.relative_humidity_percent, mlPredictInput.dew_point_c, mlPredictInput.precipitation_mmh, activeTab]);
+  }, [
+    mlPredictInput.satellite_altitude_km,
+    mlPredictInput.elevation_deg,
+    mlPredictInput.inclination_deg,
+    mlPredictInput.mean_motion_rev_per_day,
+    mlPredictInput.temperature_c,
+    mlPredictInput.relative_humidity_percent,
+    mlPredictInput.dew_point_c,
+    mlPredictInput.precipitation_mmh,
+    activeTab
+  ]);
+
+  useEffect(() => {
+    if (activeTab === 'celestrak') {
+      loadCelestrakSatellites();
+    }
+  }, [celestrakSearch, celestrakRegime, celestrakPage, activeTab]);
 
   const loadInitialData = async () => {
     setLoading(true);
     try {
-      const [ov, an, val, mp, ml] = await Promise.all([
+      const [ov, an, val, mp, ml, celOv, celSats] = await Promise.all([
         fetchDatasetOverview(),
         fetchDatasetAnalytics(),
         fetchDatasetValidation(),
         fetchDatasetMapping(),
-        fetchMLStatus().catch(() => null)
+        fetchMLStatus().catch(() => null),
+        fetchCelestrakLeoOverview().catch(() => null),
+        fetchCelestrakLeoSatellites({ limit: 25 }).catch(() => null)
       ]);
       setOverview(ov);
       setAnalytics(an);
@@ -178,6 +215,13 @@ export const DatasetPage: React.FC<Props> = ({
       setMapping(mp);
       if (ml) {
         setMlStatus(ml);
+      }
+      if (celOv?.metadata) {
+        setCelestrakOverview(celOv.metadata);
+      }
+      if (celSats) {
+        setCelestrakSatellites(celSats.satellites || []);
+        setCelestrakTotalMatching(celSats.total_matching || 14120);
       }
 
       // Pre-select a default scenario record (#245)
@@ -191,6 +235,25 @@ export const DatasetPage: React.FC<Props> = ({
       setLoading(false);
     }
   };
+
+  const loadCelestrakSatellites = async () => {
+    setCelestrakLoading(true);
+    try {
+      const res = await fetchCelestrakLeoSatellites({
+        search: celestrakSearch || undefined,
+        regime: celestrakRegime === 'All' ? undefined : celestrakRegime,
+        limit: celestrakPageSize,
+        offset: (celestrakPage - 1) * celestrakPageSize
+      });
+      setCelestrakSatellites(res.satellites || []);
+      setCelestrakTotalMatching(res.total_matching || 0);
+    } catch (err) {
+      console.error('Failed to load CelesTrak LEO satellites:', err);
+    } finally {
+      setCelestrakLoading(false);
+    }
+  };
+
 
   const loadFilteredRecords = async () => {
     setRecordsLoading(true);
@@ -325,9 +388,10 @@ export const DatasetPage: React.FC<Props> = ({
 
   const handleApplyMLPreset = (presetKey: string) => {
     setMlPresetActive(presetKey);
-    let presetData: MLPredictRequest;
+    let presetData: MLPredictRequest = { ...mlPredictInput };
     if (presetKey === 'clear_night') {
       presetData = {
+        ...presetData,
         temperature_c: 20.0,
         dew_point_c: 10.0,
         relative_humidity_percent: 45.0,
@@ -341,6 +405,7 @@ export const DatasetPage: React.FC<Props> = ({
       };
     } else if (presetKey === 'heavy_rain') {
       presetData = {
+        ...presetData,
         temperature_c: 26.5,
         dew_point_c: 26.0,
         relative_humidity_percent: 96.0,
@@ -354,6 +419,7 @@ export const DatasetPage: React.FC<Props> = ({
       };
     } else if (presetKey === 'dense_fog') {
       presetData = {
+        ...presetData,
         temperature_c: 16.0,
         dew_point_c: 15.8,
         relative_humidity_percent: 98.0,
@@ -367,6 +433,7 @@ export const DatasetPage: React.FC<Props> = ({
       };
     } else {
       presetData = {
+        ...presetData,
         temperature_c: 39.5,
         dew_point_c: 14.0,
         relative_humidity_percent: 22.0,
@@ -383,8 +450,57 @@ export const DatasetPage: React.FC<Props> = ({
     handleRunMLInference(presetData);
   };
 
+  const handleApplyLEOPreset = (leoKey: 'micius' | 'starlink' | 'iss' | 'vleo' | 'polar') => {
+    let leoData: Partial<MLPredictRequest> = {};
+    if (leoKey === 'micius') {
+      leoData = {
+        satellite_altitude_km: 500.0,
+        elevation_deg: 45.0,
+        inclination_deg: 97.4,
+        mean_motion_rev_per_day: 15.24,
+        satellite_name: 'Micius LEO Satellite (NORAD 41740)'
+      };
+    } else if (leoKey === 'starlink') {
+      leoData = {
+        satellite_altitude_km: 550.0,
+        elevation_deg: 55.0,
+        inclination_deg: 53.0,
+        mean_motion_rev_per_day: 15.06,
+        satellite_name: 'Starlink LEO Satellite (NORAD 44713)'
+      };
+    } else if (leoKey === 'iss') {
+      leoData = {
+        satellite_altitude_km: 415.0,
+        elevation_deg: 60.0,
+        inclination_deg: 51.6,
+        mean_motion_rev_per_day: 15.54,
+        satellite_name: 'ISS LEO Station (NORAD 25544)'
+      };
+    } else if (leoKey === 'vleo') {
+      leoData = {
+        satellite_altitude_km: 300.0,
+        elevation_deg: 70.0,
+        inclination_deg: 96.5,
+        mean_motion_rev_per_day: 15.90,
+        satellite_name: 'Ultra-Low VLEO Satellite'
+      };
+    } else if (leoKey === 'polar') {
+      leoData = {
+        satellite_altitude_km: 825.0,
+        elevation_deg: 35.0,
+        inclination_deg: 98.7,
+        mean_motion_rev_per_day: 14.22,
+        satellite_name: 'Polar High-LEO Satellite'
+      };
+    }
+    const updated = { ...mlPredictInput, ...leoData };
+    setMlPredictInput(updated);
+    handleRunMLInference(updated);
+  };
+
   const handleSelectRecordForML = (rec: DatasetRecord) => {
     const updated: MLPredictRequest = {
+      ...mlPredictInput,
       temperature_c: rec.temperature_c,
       dew_point_c: rec.dew_point_c,
       relative_humidity_percent: rec.relative_humidity_percent,
@@ -405,11 +521,11 @@ export const DatasetPage: React.FC<Props> = ({
   const totalPages = Math.ceil(totalMatching / pageSize);
 
   const SATELLITE_NAMES: Record<number, string> = {
-    41740: "Micius QKD (NORAD #41740)",
-    25544: "ISS National Lab (NORAD #25544)",
-    48274: "Tiangong Space Station (NORAD #48274)",
-    44713: "Starlink Polar FSO (NORAD #44713)",
-    43013: "NOAA-20 Weather (NORAD #43013)"
+    41740: "Micius LEO QKD (NORAD #41740)",
+    25544: "ISS LEO Space Station (NORAD #25544)",
+    48274: "Tiangong LEO Station (NORAD #48274)",
+    44713: "Starlink LEO Constellation (NORAD #44713)",
+    43013: "NOAA-20 Polar LEO (NORAD #43013)"
   };
 
   return (
@@ -422,27 +538,38 @@ export const DatasetPage: React.FC<Props> = ({
           <div>
             <div className="flex flex-wrap items-center gap-2 mb-2">
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono">
-                NASA POWER / MERRA-2
+                NASA POWER + CelesTrak LEO
+              </span>
+              <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30">
+                14,120 Low Earth Orbit (LEO) Satellites
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
                 8,760 Hourly Observations (2025 Full Year)
               </span>
               <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-purple-500/20 text-purple-300 border border-purple-500/30">
-                Station Lat 14.0° N, Lon 78.0° E, 604m
+                LEO Satellite QKD Priority Focus
               </span>
             </div>
 
             <h1 className="text-2xl font-black tracking-tight text-white flex items-center gap-2.5">
               <Database className="w-6 h-6 text-cyan-400" />
-              Empirical NASA POWER Dataset & QKD Verification
+              NASA POWER & CelesTrak LEO Satellite QKD Dataset
             </h1>
             <p className="text-xs text-slate-300 mt-1 max-w-3xl leading-relaxed">
-              Real-world space-to-ground quantum optical link performance evaluation driven directly by actual 1-year hourly meteorological observations.
-              Zero invented data: incorporates empirical temperature, relative humidity, dew-point depression, atmospheric pressure, wind shear, and precipitation.
+              Multi-source Low Earth Orbit (LEO) quantum optical link evaluation driven directly by actual 1-year continuous NASA POWER meteorological data
+              and 14,120 CelesTrak LEO satellite orbital ephemerides. Features high-fidelity Random Forest surrogate models trained specifically for LEO satellite downlinks.
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <div className="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-xl px-4 py-3 text-center min-w-[120px]">
+              <span className="text-[10px] uppercase font-bold text-slate-400 block">LEO Satellites</span>
+              <span className="text-xl font-mono font-bold text-teal-400">
+                {celestrakOverview?.leo_satellites_count?.toLocaleString() ?? '14,120'}
+              </span>
+              <span className="text-[9px] text-slate-400 block">160 - 2,000 km</span>
+            </div>
+
             <div className="bg-slate-800/80 backdrop-blur border border-slate-700 rounded-xl px-4 py-3 text-center min-w-[120px]">
               <span className="text-[10px] uppercase font-bold text-slate-400 block">Annual Availability</span>
               <span className="text-xl font-mono font-bold text-emerald-400">
@@ -508,7 +635,20 @@ export const DatasetPage: React.FC<Props> = ({
           }`}
         >
           <Search className="w-3.5 h-3.5" />
-          <span>Hourly Records Browser ({totalMatching.toLocaleString()})</span>
+          <span>NASA Hourly Records ({totalMatching.toLocaleString()})</span>
+        </button>
+
+        <button
+          onClick={() => setActiveTab('celestrak')}
+          className={`flex items-center gap-2 px-4 py-2 rounded-xl text-xs font-bold transition-all ${
+            activeTab === 'celestrak'
+              ? 'bg-teal-600 text-white shadow-md shadow-teal-600/20'
+              : 'bg-white text-slate-600 hover:bg-slate-100 border border-slate-200'
+          }`}
+        >
+          <Satellite className="w-3.5 h-3.5" />
+          <span>CelesTrak LEO Satellites (14,120)</span>
+          <span className="px-1.5 py-0.5 rounded text-[9px] bg-teal-100 text-teal-800 font-mono font-bold">LEO ONLY</span>
         </button>
 
         <button
@@ -1034,6 +1174,304 @@ export const DatasetPage: React.FC<Props> = ({
                 </div>
               </div>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* TAB: CELESTRAK LEO SATELLITES (14,120 SATELLITES)              */}
+      {/* ============================================================== */}
+      {activeTab === 'celestrak' && (
+        <div className="space-y-6">
+          {/* LEO BANNER */}
+          <div className="bg-gradient-to-r from-slate-900 via-teal-950 to-slate-900 rounded-2xl p-6 border border-teal-800/60 text-white shadow-xl relative overflow-hidden">
+            <div className="absolute right-0 top-0 translate-x-12 -translate-y-12 w-64 h-64 bg-teal-500/10 rounded-full blur-3xl pointer-events-none" />
+
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 relative z-10">
+              <div className="space-y-2">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-teal-500/20 text-teal-300 border border-teal-500/30 font-mono">
+                    CelesTrak Orbital Database (TLE 3-April-2026)
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/30">
+                    Filter: Orbit Type = LEO (100% Verified)
+                  </span>
+                  <span className="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-cyan-500/20 text-cyan-300 border border-cyan-500/30 font-mono">
+                    14,120 LEO Satellites
+                  </span>
+                </div>
+
+                <h2 className="text-xl font-black tracking-tight text-white flex items-center gap-2.5">
+                  <Satellite className="w-6 h-6 text-teal-400" />
+                  CelesTrak Low Earth Orbit (LEO) Satellite Database & Ephemerides
+                </h2>
+                <p className="text-xs text-slate-300 max-w-3xl leading-relaxed">
+                  Extracted from live CelesTrak orbital element tracking. We focus exclusively on LEO satellites (160 - 2,000 km altitude)
+                  because quantum satellite communication is optimized for LEO altitudes to minimize optical free-space beam diffraction while
+                  achieving high secret key rate yield during ground station overpasses.
+                </p>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <button
+                  onClick={() => {
+                    handleApplyLEOPreset('micius');
+                    setActiveTab('ml');
+                    handleRunMLInference({ satellite_altitude_km: 500.0, elevation_deg: 45.0, inclination_deg: 97.4 });
+                  }}
+                  className="px-4 py-2.5 rounded-xl text-xs font-bold bg-teal-600 hover:bg-teal-700 text-white flex items-center gap-2 shadow-lg shadow-teal-600/30 transition-all border border-teal-400/30"
+                >
+                  <Brain className="w-4 h-4 text-white" />
+                  <span>Test in ML Surrogate</span>
+                </button>
+              </div>
+            </div>
+
+            {/* LEO STATS TILES */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-6 pt-5 border-t border-teal-800/40 text-xs">
+              <div className="bg-slate-800/60 p-3 rounded-xl border border-teal-900/40">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Total LEO Satellites</span>
+                <span className="text-base font-bold font-mono text-teal-300">{celestrakOverview?.leo_satellites_count?.toLocaleString() ?? '14,120'} sats</span>
+                <span className="text-[9px] text-slate-400 block mt-0.5">160 km - 2,000 km altitude</span>
+              </div>
+              <div className="bg-slate-800/60 p-3 rounded-xl border border-teal-900/40">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Mean LEO Altitude</span>
+                <span className="text-base font-bold font-mono text-cyan-300">{celestrakOverview?.mean_altitude_km ?? '561.1'} km</span>
+                <span className="text-[9px] text-slate-400 block mt-0.5">Range: 196 km - 1,834 km</span>
+              </div>
+              <div className="bg-slate-800/60 p-3 rounded-xl border border-teal-900/40">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Mean Inclination</span>
+                <span className="text-base font-bold font-mono text-purple-300">{celestrakOverview?.mean_inclination_deg ?? '62.7'}°</span>
+                <span className="text-[9px] text-slate-400 block mt-0.5">Equatorial to Sun-Synch</span>
+              </div>
+              <div className="bg-slate-800/60 p-3 rounded-xl border border-teal-900/40">
+                <span className="text-[10px] text-slate-400 uppercase font-semibold block">Mean Orbital Period</span>
+                <span className="text-base font-bold font-mono text-emerald-300">{celestrakOverview?.mean_orbital_period_min ?? '95.6'} mins</span>
+                <span className="text-[9px] text-slate-400 block mt-0.5">~15.07 revolutions/day</span>
+              </div>
+            </div>
+          </div>
+
+          {/* LEO REGIMES SUMMARY CHIPS */}
+          <div className="grid grid-cols-2 md:grid-cols-5 gap-3">
+            <div
+              onClick={() => { setCelestrakRegime('VLEO'); setCelestrakPage(1); }}
+              className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                celestrakRegime === 'VLEO'
+                  ? 'bg-teal-50 border-teal-400 shadow-sm'
+                  : 'bg-white border-slate-200 hover:border-teal-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-900">VLEO</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 bg-teal-100 text-teal-800 rounded font-bold">&lt; 350 km</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">Minimal free-space loss, very fast ground transit (6-8 mins).</p>
+            </div>
+
+            <div
+              onClick={() => { setCelestrakRegime('Low LEO'); setCelestrakPage(1); }}
+              className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                celestrakRegime === 'Low LEO'
+                  ? 'bg-teal-50 border-teal-400 shadow-sm'
+                  : 'bg-white border-slate-200 hover:border-teal-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-900">Low LEO</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 bg-teal-100 text-teal-800 rounded font-bold">350 - 500 km</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">ISS (415 km), Tiangong (385 km). Excellent QKD signal strength.</p>
+            </div>
+
+            <div
+              onClick={() => { setCelestrakRegime('Mid LEO'); setCelestrakPage(1); }}
+              className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                celestrakRegime === 'Mid LEO'
+                  ? 'bg-teal-50 border-teal-400 shadow-sm'
+                  : 'bg-white border-slate-200 hover:border-teal-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-900">Mid LEO</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 bg-teal-100 text-teal-800 rounded font-bold">500 - 650 km</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">Micius QKD (500 km), Starlink (550 km). Global standard orbit.</p>
+            </div>
+
+            <div
+              onClick={() => { setCelestrakRegime('High LEO'); setCelestrakPage(1); }}
+              className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                celestrakRegime === 'High LEO'
+                  ? 'bg-teal-50 border-teal-400 shadow-sm'
+                  : 'bg-white border-slate-200 hover:border-teal-300'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold text-slate-900">High LEO</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 bg-teal-100 text-teal-800 rounded font-bold">650 - 1200 km</span>
+              </div>
+              <p className="text-[10px] text-slate-500 mt-1">NOAA Polar (825 km), OneWeb (1200 km). Extended pass windows (12-14 min).</p>
+            </div>
+
+            <div
+              onClick={() => { setCelestrakRegime('All'); setCelestrakPage(1); }}
+              className={`p-3.5 rounded-xl border cursor-pointer transition-all ${
+                celestrakRegime === 'All'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'bg-white border-slate-200 hover:border-slate-400'
+              }`}
+            >
+              <div className="flex items-center justify-between">
+                <span className="text-[11px] font-bold">All LEO Satellites</span>
+                <span className="text-[10px] font-mono px-1.5 py-0.2 bg-slate-800 text-slate-300 rounded font-bold">14,120</span>
+              </div>
+              <p className="text-[10px] opacity-75 mt-1">Reset all altitude and constellation filters.</p>
+            </div>
+          </div>
+
+          {/* SEARCH & FILTER BAR */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-4 flex flex-col md:flex-row gap-3 items-center justify-between">
+            <div className="relative w-full md:w-80">
+              <Search className="w-4 h-4 absolute left-3 top-3 text-slate-400" />
+              <input
+                type="text"
+                placeholder="Search LEO satellite (e.g. MICIUS, STARLINK, ISS)..."
+                value={celestrakSearch}
+                onChange={(e) => {
+                  setCelestrakSearch(e.target.value);
+                  setCelestrakPage(1);
+                }}
+                className="w-full pl-9 pr-4 py-2 border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-teal-500"
+              />
+            </div>
+
+            <div className="flex items-center gap-2 text-xs text-slate-600">
+              <span className="font-semibold">Showing:</span>
+              <span className="font-mono font-bold text-teal-700">{celestrakTotalMatching.toLocaleString()}</span>
+              <span>matching LEO satellites</span>
+            </div>
+          </div>
+
+          {/* LEO SATELLITES TABLE */}
+          <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-left text-xs">
+                <thead className="bg-slate-50 border-b border-slate-200 text-slate-600 font-bold">
+                  <tr>
+                    <th className="py-3 px-3">#</th>
+                    <th className="py-3 px-4">Satellite Name</th>
+                    <th className="py-3 px-3">Altitude</th>
+                    <th className="py-3 px-3">Regime</th>
+                    <th className="py-3 px-3">Inclination</th>
+                    <th className="py-3 px-3">Mean Motion</th>
+                    <th className="py-3 px-3">Period</th>
+                    <th className="py-3 px-3">Zenith Loss</th>
+                    <th className="py-3 px-4 text-right">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-100 font-mono">
+                  {celestrakLoading ? (
+                    <tr>
+                      <td colSpan={9} className="py-12 text-center text-slate-400 font-sans">
+                        <RefreshCw className="w-6 h-6 animate-spin mx-auto mb-2 text-teal-600" />
+                        <span>Searching 14,120 CelesTrak LEO satellites...</span>
+                      </td>
+                    </tr>
+                  ) : celestrakSatellites.length === 0 ? (
+                    <tr>
+                      <td colSpan={9} className="py-8 text-center text-slate-400 font-sans">
+                        No LEO satellites matched your search.
+                      </td>
+                    </tr>
+                  ) : (
+                    celestrakSatellites.map((sat, sIdx) => {
+                      const isMid = sat.regime.includes('Mid');
+                      const isLow = sat.regime.includes('Low');
+                      const isVleo = sat.regime.includes('VLEO');
+
+                      return (
+                        <tr key={sat.id || sIdx} className="hover:bg-slate-50 transition-colors">
+                          <td className="py-2.5 px-3 font-semibold text-slate-400">{sat.id}</td>
+                          <td className="py-2.5 px-4 font-sans font-bold text-slate-900">
+                            <div className="flex items-center gap-1.5">
+                              <Satellite className="w-3.5 h-3.5 text-teal-600 shrink-0" />
+                              <span className="truncate max-w-[220px]">{sat.name}</span>
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3 font-bold text-teal-800">{sat.altitude_km.toFixed(1)} km</td>
+                          <td className="py-2.5 px-3 font-sans">
+                            <span className={`px-2 py-0.5 rounded text-[10px] font-bold ${
+                              isVleo
+                                ? 'bg-purple-100 text-purple-800'
+                                : isLow
+                                ? 'bg-cyan-100 text-cyan-800'
+                                : isMid
+                                ? 'bg-teal-100 text-teal-800'
+                                : 'bg-slate-100 text-slate-700'
+                            }`}>
+                              {sat.regime}
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 text-slate-700">{sat.inclination_deg.toFixed(2)}°</td>
+                          <td className="py-2.5 px-3 text-slate-600">{sat.mean_motion_rev_per_day.toFixed(2)} rev/d</td>
+                          <td className="py-2.5 px-3 text-slate-600">{sat.orbital_period_min.toFixed(1)} m</td>
+                          <td className="py-2.5 px-3 font-bold text-cyan-800">{sat.zenith_loss_db.toFixed(1)} dB</td>
+                          <td className="py-2.5 px-4 text-right font-sans">
+                            <button
+                              onClick={() => {
+                                setMlPredictInput((prev) => ({
+                                  ...prev,
+                                  satellite_altitude_km: sat.altitude_km,
+                                  elevation_deg: 45.0,
+                                  inclination_deg: sat.inclination_deg,
+                                  mean_motion_rev_per_day: sat.mean_motion_rev_per_day,
+                                  satellite_name: `${sat.name} (LEO)`
+                                }));
+                                setActiveTab('ml');
+                                handleRunMLInference({
+                                  satellite_altitude_km: sat.altitude_km,
+                                  elevation_deg: 45.0,
+                                  inclination_deg: sat.inclination_deg,
+                                  mean_motion_rev_per_day: sat.mean_motion_rev_per_day
+                                });
+                              }}
+                              className="px-2.5 py-1 rounded-lg text-[11px] font-bold bg-teal-50 hover:bg-teal-600 hover:text-white text-teal-700 border border-teal-200 transition-all inline-flex items-center gap-1 shadow-sm"
+                            >
+                              <Brain className="w-3 h-3" />
+                              <span>Test in ML</span>
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Pagination */}
+            <div className="p-3 bg-slate-50 border-t border-slate-200 flex items-center justify-between text-xs">
+              <span className="text-slate-500">
+                Page {celestrakPage} of {Math.ceil(celestrakTotalMatching / celestrakPageSize) || 1}
+              </span>
+              <div className="flex gap-1.5">
+                <button
+                  onClick={() => setCelestrakPage((p) => Math.max(1, p - 1))}
+                  disabled={celestrakPage === 1}
+                  className="px-3 py-1 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                >
+                  Previous
+                </button>
+                <button
+                  onClick={() => setCelestrakPage((p) => p + 1)}
+                  disabled={celestrakPage * celestrakPageSize >= celestrakTotalMatching}
+                  className="px-3 py-1 bg-white border border-slate-300 rounded-lg text-slate-700 hover:bg-slate-100 disabled:opacity-40"
+                >
+                  Next
+                </button>
+              </div>
+            </div>
           </div>
         </div>
       )}
@@ -1687,165 +2125,333 @@ export const DatasetPage: React.FC<Props> = ({
           </div>
 
           {/* INTERACTIVE LIVE ML INFERENCE & COMPARISON WIDGET */}
-          <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-100 pb-4">
-              <div>
-                <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
-                  <Zap className="w-4 h-4 text-purple-600" />
-                  Live ML Inference vs. First-Principles Physics Comparator
-                </h3>
-                <p className="text-xs text-slate-500 mt-0.5">
-                  Execute the trained ML model surrogate on any meteorological state and verify prediction accuracy against analytical physics.
-                </p>
-              </div>
+          {(() => {
+            const liveAltKm = mlPredictInput.satellite_altitude_km ?? 500.0;
+            const liveElevDeg = mlPredictInput.elevation_deg ?? 45.0;
+            const Re = 6371.0;
+            const elRad = (Math.max(liveElevDeg, 5.0) * Math.PI) / 180.0;
+            const liveSlantKm = Math.sqrt(Re * Re * Math.sin(elRad) * Math.sin(elRad) + 2 * Re * liveAltKm + liveAltKm * liveAltKm) - Re * Math.sin(elRad);
+            const liveAirmass = 1.0 / (Math.sin(elRad) + 0.50572 * Math.pow(Math.max(liveElevDeg, 5.0) + 6.07995, -1.6364));
+            const liveGeoLossDb = 24.20 + 20.0 * Math.log10(Math.max(liveSlantKm, 100.0) / 500.0);
 
-              {/* QUICK PRESETS */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] font-semibold text-slate-400 mr-1">Presets:</span>
-                <button
-                  onClick={() => handleApplyMLPreset('clear_night')}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                    mlPresetActive === 'clear_night'
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Clear Night (Optimal)
-                </button>
-                <button
-                  onClick={() => handleApplyMLPreset('dense_fog')}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                    mlPresetActive === 'dense_fog'
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Dense Fog
-                </button>
-                <button
-                  onClick={() => handleApplyMLPreset('heavy_rain')}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                    mlPresetActive === 'heavy_rain'
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Monsoon Rain (Abort)
-                </button>
-                <button
-                  onClick={() => handleApplyMLPreset('hot_noon')}
-                  className={`px-2.5 py-1 rounded-lg text-[11px] font-bold transition-all ${
-                    mlPresetActive === 'hot_noon'
-                      ? 'bg-purple-600 text-white shadow-sm'
-                      : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
-                  }`}
-                >
-                  Hot Noon Turbulence
-                </button>
-              </div>
-            </div>
-
-            {/* PARAMETER SLIDERS & CONTROLS */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 p-4 rounded-xl bg-slate-50 border border-slate-200 text-xs">
-              <div className="space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="font-semibold text-slate-700">Temperature (°C):</span>
-                  <span className="font-mono font-bold text-purple-700">{mlPredictInput.temperature_c}°C</span>
+            return (
+              <div className="bg-white rounded-xl border border-slate-200 shadow-sm p-6 space-y-6">
+                <div className="border-b border-slate-100 pb-4">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
+                        <Zap className="w-4 h-4 text-purple-600" />
+                        Live Multi-Source ML Inference: CelesTrak LEO Satellite + NASA POWER
+                      </h3>
+                      <p className="text-xs text-slate-500 mt-0.5">
+                        Execute the 16-feature trained Random Forest ML surrogate on real LEO satellite orbital telemetry coupled with atmospheric boundary weather.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-mono font-bold px-2.5 py-1 bg-cyan-100 text-cyan-800 rounded-full border border-cyan-200">
+                        CelesTrak LEO + NASA POWER MERRA-2
+                      </span>
+                    </div>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="45"
-                  step="0.5"
-                  value={mlPredictInput.temperature_c}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setMlPresetActive('custom');
-                    setMlPredictInput((prev) => ({ ...prev, temperature_c: val, record_id: null }));
-                  }}
-                  onPointerUp={() => handleRunMLInference()}
-                  className="w-full accent-purple-600 cursor-pointer"
-                />
-              </div>
 
-              <div className="space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="font-semibold text-slate-700">Relative Humidity (%):</span>
-                  <span className="font-mono font-bold text-purple-700">{mlPredictInput.relative_humidity_percent}%</span>
+                {/* 1. CELESTRAK LEO SATELLITE CONTROLS & PRESETS */}
+                <div className="p-4 rounded-xl bg-gradient-to-r from-cyan-50/50 via-purple-50/30 to-blue-50/40 border border-cyan-200 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-cyan-100 pb-2.5">
+                    <span className="text-xs font-bold text-cyan-950 uppercase flex items-center gap-1.5">
+                      <Satellite className="w-4 h-4 text-cyan-600" />
+                      CelesTrak LEO Satellite Orbital Telemetry Inputs
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-semibold text-slate-500 mr-1">LEO Presets:</span>
+                      <button
+                        onClick={() => handleApplyLEOPreset('micius')}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white text-cyan-800 hover:bg-cyan-100 border border-cyan-300 transition-all shadow-xs"
+                      >
+                        Micius LEO (500km)
+                      </button>
+                      <button
+                        onClick={() => handleApplyLEOPreset('starlink')}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white text-cyan-800 hover:bg-cyan-100 border border-cyan-300 transition-all shadow-xs"
+                      >
+                        Starlink LEO (550km)
+                      </button>
+                      <button
+                        onClick={() => handleApplyLEOPreset('iss')}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white text-cyan-800 hover:bg-cyan-100 border border-cyan-300 transition-all shadow-xs"
+                      >
+                        ISS LEO (415km)
+                      </button>
+                      <button
+                        onClick={() => handleApplyLEOPreset('vleo')}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white text-cyan-800 hover:bg-cyan-100 border border-cyan-300 transition-all shadow-xs"
+                      >
+                        Ultra-Low VLEO (300km)
+                      </button>
+                      <button
+                        onClick={() => handleApplyLEOPreset('polar')}
+                        className="px-2 py-0.5 rounded-lg text-[10px] font-bold bg-white text-cyan-800 hover:bg-cyan-100 border border-cyan-300 transition-all shadow-xs"
+                      >
+                        Polar High-LEO (825km)
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* LEO Satellite Sliders */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs pt-1">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-700">LEO Altitude:</span>
+                        <span className="font-mono font-bold text-cyan-800">{liveAltKm.toFixed(0)} km</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="200"
+                        max="1500"
+                        step="10"
+                        value={liveAltKm}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setMlPresetActive('custom');
+                          setMlPredictInput((prev) => ({ ...prev, satellite_altitude_km: val }));
+                        }}
+                        onPointerUp={() => handleRunMLInference()}
+                        className="w-full accent-cyan-600 cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-700">Elevation Look Angle:</span>
+                        <span className="font-mono font-bold text-cyan-800">{liveElevDeg.toFixed(1)}°</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="10"
+                        max="90"
+                        step="1"
+                        value={liveElevDeg}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setMlPresetActive('custom');
+                          setMlPredictInput((prev) => ({ ...prev, elevation_deg: val }));
+                        }}
+                        onPointerUp={() => handleRunMLInference()}
+                        className="w-full accent-cyan-600 cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-700">Orbit Inclination:</span>
+                        <span className="font-mono font-bold text-cyan-800">{(mlPredictInput.inclination_deg ?? 97.4).toFixed(1)}°</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="20"
+                        max="110"
+                        step="0.5"
+                        value={mlPredictInput.inclination_deg ?? 97.4}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setMlPresetActive('custom');
+                          setMlPredictInput((prev) => ({ ...prev, inclination_deg: val }));
+                        }}
+                        onPointerUp={() => handleRunMLInference()}
+                        className="w-full accent-cyan-600 cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-700">Mean Motion:</span>
+                        <span className="font-mono font-bold text-cyan-800">{(mlPredictInput.mean_motion_rev_per_day ?? 15.24).toFixed(2)} rev/day</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="12.0"
+                        max="16.5"
+                        step="0.05"
+                        value={mlPredictInput.mean_motion_rev_per_day ?? 15.24}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setMlPresetActive('custom');
+                          setMlPredictInput((prev) => ({ ...prev, mean_motion_rev_per_day: val }));
+                        }}
+                        onPointerUp={() => handleRunMLInference()}
+                        className="w-full accent-cyan-600 cursor-pointer"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Derived Real-time Physics Badges for LEO Satellite */}
+                  <div className="flex flex-wrap items-center gap-3 pt-2 text-[11px] text-slate-600 border-t border-cyan-100">
+                    <span className="font-medium text-slate-500">Live LEO Geometry:</span>
+                    <span className="font-mono bg-white px-2 py-0.5 rounded border border-cyan-200 text-cyan-900 font-semibold">
+                      Slant Range: <strong className="text-cyan-700">{liveSlantKm.toFixed(1)} km</strong>
+                    </span>
+                    <span className="font-mono bg-white px-2 py-0.5 rounded border border-cyan-200 text-cyan-900 font-semibold">
+                      Airmass sec(ζ): <strong className="text-cyan-700">{liveAirmass.toFixed(2)}×</strong>
+                    </span>
+                    <span className="font-mono bg-white px-2 py-0.5 rounded border border-cyan-200 text-cyan-900 font-semibold">
+                      Geometric Diffraction Loss (L_geo): <strong className="text-cyan-700">{liveGeoLossDb.toFixed(2)} dB</strong>
+                    </span>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="10"
-                  max="100"
-                  step="1"
-                  value={mlPredictInput.relative_humidity_percent}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setMlPresetActive('custom');
-                    setMlPredictInput((prev) => ({ ...prev, relative_humidity_percent: val, record_id: null }));
-                  }}
-                  onPointerUp={() => handleRunMLInference()}
-                  className="w-full accent-purple-600 cursor-pointer"
-                />
-              </div>
 
-              <div className="space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="font-semibold text-slate-700">Dew Point (°C):</span>
-                  <span className="font-mono font-bold text-purple-700">{mlPredictInput.dew_point_c}°C</span>
+                {/* 2. NASA POWER WEATHER CONTROLS & PRESETS */}
+                <div className="p-4 rounded-xl bg-slate-50 border border-slate-200 space-y-3">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-slate-200 pb-2.5">
+                    <span className="text-xs font-bold text-slate-800 uppercase flex items-center gap-1.5">
+                      <Thermometer className="w-4 h-4 text-purple-600" />
+                      NASA POWER Boundary Layer Meteorology Inputs
+                    </span>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-semibold text-slate-400 mr-1">Weather Presets:</span>
+                      <button
+                        onClick={() => handleApplyMLPreset('clear_night')}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
+                          mlPresetActive === 'clear_night'
+                            ? 'bg-purple-600 text-white shadow-xs'
+                            : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
+                        }`}
+                      >
+                        Clear Night (Optimal)
+                      </button>
+                      <button
+                        onClick={() => handleApplyMLPreset('dense_fog')}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
+                          mlPresetActive === 'dense_fog'
+                            ? 'bg-purple-600 text-white shadow-xs'
+                            : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
+                        }`}
+                      >
+                        Dense Fog
+                      </button>
+                      <button
+                        onClick={() => handleApplyMLPreset('heavy_rain')}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
+                          mlPresetActive === 'heavy_rain'
+                            ? 'bg-purple-600 text-white shadow-xs'
+                            : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
+                        }`}
+                      >
+                        Monsoon Rain (Abort)
+                      </button>
+                      <button
+                        onClick={() => handleApplyMLPreset('hot_noon')}
+                        className={`px-2 py-0.5 rounded-lg text-[10px] font-bold transition-all ${
+                          mlPresetActive === 'hot_noon'
+                            ? 'bg-purple-600 text-white shadow-xs'
+                            : 'bg-white text-slate-600 hover:bg-slate-200 border border-slate-200'
+                        }`}
+                      >
+                        Hot Noon Turbulence
+                      </button>
+                    </div>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 text-xs pt-1">
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-700">Temperature (°C):</span>
+                        <span className="font-mono font-bold text-purple-700">{mlPredictInput.temperature_c}°C</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="45"
+                        step="0.5"
+                        value={mlPredictInput.temperature_c}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setMlPresetActive('custom');
+                          setMlPredictInput((prev) => ({ ...prev, temperature_c: val, record_id: null }));
+                        }}
+                        onPointerUp={() => handleRunMLInference()}
+                        className="w-full accent-purple-600 cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-700">Relative Humidity (%):</span>
+                        <span className="font-mono font-bold text-purple-700">{mlPredictInput.relative_humidity_percent}%</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="10"
+                        max="100"
+                        step="1"
+                        value={mlPredictInput.relative_humidity_percent}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setMlPresetActive('custom');
+                          setMlPredictInput((prev) => ({ ...prev, relative_humidity_percent: val, record_id: null }));
+                        }}
+                        onPointerUp={() => handleRunMLInference()}
+                        className="w-full accent-purple-600 cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-700">Dew Point (°C):</span>
+                        <span className="font-mono font-bold text-purple-700">{mlPredictInput.dew_point_c}°C</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="-5"
+                        max="35"
+                        step="0.5"
+                        value={mlPredictInput.dew_point_c}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setMlPresetActive('custom');
+                          setMlPredictInput((prev) => ({ ...prev, dew_point_c: val, record_id: null }));
+                        }}
+                        onPointerUp={() => handleRunMLInference()}
+                        className="w-full accent-purple-600 cursor-pointer"
+                      />
+                    </div>
+
+                    <div className="space-y-1.5">
+                      <div className="flex justify-between">
+                        <span className="font-semibold text-slate-700">Precipitation (mm/h):</span>
+                        <span className="font-mono font-bold text-purple-700">{mlPredictInput.precipitation_mmh} mm/h</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0"
+                        max="30"
+                        step="0.5"
+                        value={mlPredictInput.precipitation_mmh}
+                        onChange={(e) => {
+                          const val = parseFloat(e.target.value);
+                          setMlPresetActive('custom');
+                          setMlPredictInput((prev) => ({ ...prev, precipitation_mmh: val, record_id: null }));
+                        }}
+                        onPointerUp={() => handleRunMLInference()}
+                        className="w-full accent-purple-600 cursor-pointer"
+                      />
+                    </div>
+                  </div>
                 </div>
-                <input
-                  type="range"
-                  min="-5"
-                  max="35"
-                  step="0.5"
-                  value={mlPredictInput.dew_point_c}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setMlPresetActive('custom');
-                    setMlPredictInput((prev) => ({ ...prev, dew_point_c: val, record_id: null }));
-                  }}
-                  onPointerUp={() => handleRunMLInference()}
-                  className="w-full accent-purple-600 cursor-pointer"
-                />
-              </div>
 
-              <div className="space-y-1.5">
-                <div className="flex justify-between">
-                  <span className="font-semibold text-slate-700">Precipitation (mm/h):</span>
-                  <span className="font-mono font-bold text-purple-700">{mlPredictInput.precipitation_mmh} mm/h</span>
+                {/* Inference status bar */}
+                <div className="flex items-center justify-between pt-1">
+                  <span className="text-[11px] text-slate-500">
+                    Adjust LEO satellite orbital or weather parameters to run dual-source ML surrogate inference in real time (&lt;0.5ms).
+                  </span>
+                  <button
+                    onClick={() => handleRunMLInference()}
+                    disabled={mlPredictLoading}
+                    className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
+                  >
+                    <Zap className={`w-3.5 h-3.5 ${mlPredictLoading ? 'animate-spin' : ''}`} />
+                    <span>{mlPredictLoading ? 'Computing ML Surrogate...' : 'Re-calculate Inference'}</span>
+                  </button>
                 </div>
-                <input
-                  type="range"
-                  min="0"
-                  max="30"
-                  step="0.5"
-                  value={mlPredictInput.precipitation_mmh}
-                  onChange={(e) => {
-                    const val = parseFloat(e.target.value);
-                    setMlPresetActive('custom');
-                    setMlPredictInput((prev) => ({ ...prev, precipitation_mmh: val, record_id: null }));
-                  }}
-                  onPointerUp={() => handleRunMLInference()}
-                  className="w-full accent-purple-600 cursor-pointer"
-                />
-              </div>
-            </div>
-
-            {/* Inference status bar */}
-            <div className="flex items-center justify-between pt-1">
-              <span className="text-[11px] text-slate-500">
-                Adjust sliders to simulate changing boundary layer weather. Predictions compute seamlessly with zero lag.
-              </span>
-              <button
-                onClick={() => handleRunMLInference()}
-                disabled={mlPredictLoading}
-                className="px-3.5 py-1.5 bg-purple-600 hover:bg-purple-700 disabled:opacity-50 text-white rounded-lg font-bold text-xs flex items-center gap-1.5 shadow-sm transition-all"
-              >
-                <Zap className={`w-3.5 h-3.5 ${mlPredictLoading ? 'animate-spin' : ''}`} />
-                <span>{mlPredictLoading ? 'Computing ML Surrogate...' : 'Re-calculate Inference'}</span>
-              </button>
-            </div>
 
             {/* COMPARISON RESULTS: ML PREDICTION VS PHYSICS SIMULATION */}
             {mlPredictResult && (
@@ -1860,6 +2466,11 @@ export const DatasetPage: React.FC<Props> = ({
                     <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-purple-100 text-purple-800 font-bold">
                       Latency &lt;0.5ms
                     </span>
+                  </div>
+
+                  <div className="bg-purple-100/60 rounded-lg p-2 text-[11px] text-purple-900 font-medium flex items-center justify-between border border-purple-200/50">
+                    <span className="truncate">📡 {mlPredictInput.satellite_name ?? 'LEO Satellite'}</span>
+                    <span className="shrink-0 font-mono font-bold text-purple-700 ml-2">{liveAltKm} km alt @ {liveElevDeg}° el</span>
                   </div>
 
                   <div className="space-y-2 text-xs">
@@ -1977,6 +2588,8 @@ export const DatasetPage: React.FC<Props> = ({
               </div>
             )}
           </div>
+            );
+          })()}
         </div>
       )}
       {activeTab === 'mapping' && mapping && (

@@ -14,6 +14,8 @@ import {
   MLStatusResponse,
   MLPredictRequest,
   MLPredictResponse,
+  CelestrakLeoOverview,
+  CelestrakLeoSatellite,
   QuantumLabRequest,
   QuantumLabResult,
   QuantumLabHistoryItem,
@@ -310,6 +312,42 @@ export async function fetchJoinedPass(recordId: number, noradId: number = 41740)
   const res = await fetch(`${API_BASE_URL}/api/dataset/joined-pass?record_id=${recordId}&satellite_norad_id=${noradId}`);
   if (!res.ok) {
     throw new Error('Failed to load joined pass data');
+  }
+  return res.json();
+}
+
+export async function fetchCelestrakLeoOverview(): Promise<{
+  metadata: CelestrakLeoOverview;
+  sample_satellites: CelestrakLeoSatellite[];
+  total_leo_satellites: number;
+  paired_passes_count: number;
+}> {
+  const res = await fetch(`${API_BASE_URL}/api/dataset/celestrak-leo/overview`);
+  if (!res.ok) {
+    throw new Error('Failed to load CelesTrak LEO dataset overview');
+  }
+  return res.json();
+}
+
+export async function fetchCelestrakLeoSatellites(params?: {
+  search?: string;
+  regime?: string;
+  min_alt?: number;
+  max_alt?: number;
+  limit?: number;
+  offset?: number;
+}): Promise<{ total_leo_satellites: number; total_matching: number; limit: number; offset: number; satellites: CelestrakLeoSatellite[] }> {
+  const q = new URLSearchParams();
+  if (params?.search) q.append('search', params.search);
+  if (params?.regime && params.regime !== 'All') q.append('regime', params.regime);
+  if (params?.min_alt !== undefined) q.append('min_alt', params.min_alt.toString());
+  if (params?.max_alt !== undefined) q.append('max_alt', params.max_alt.toString());
+  if (params?.limit) q.append('limit', params.limit.toString());
+  if (params?.offset !== undefined) q.append('offset', params.offset.toString());
+
+  const res = await fetch(`${API_BASE_URL}/api/dataset/celestrak-leo/satellites?${q.toString()}`);
+  if (!res.ok) {
+    throw new Error('Failed to fetch CelesTrak LEO satellites');
   }
   return res.json();
 }

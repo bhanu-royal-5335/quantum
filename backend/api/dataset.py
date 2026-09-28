@@ -54,6 +54,39 @@ def get_dataset_mapping() -> Dict[str, Any]:
     return dataset_processor.get_dataset_mapping()
 
 
+@router.get("/celestrak-leo/overview")
+def get_celestrak_leo_overview() -> Dict[str, Any]:
+    """Retrieve CelesTrak LEO satellite dataset metadata, orbital regimes, and constellations."""
+    return dataset_processor.get_celestrak_leo_overview()
+
+
+@router.get("/celestrak-leo/satellites")
+def get_celestrak_leo_satellites(
+    search: Optional[str] = Query(None, description="Search LEO satellite name"),
+    regime: Optional[str] = Query(None, description="Filter by LEO orbital regime"),
+    min_alt: Optional[float] = Query(None, ge=100.0, le=2000.0),
+    max_alt: Optional[float] = Query(None, ge=100.0, le=2000.0),
+    limit: int = Query(50, ge=1, le=500),
+    offset: int = Query(0, ge=0)
+) -> Dict[str, Any]:
+    """Retrieve paginated and filtered list of 14,120 CelesTrak Low Earth Orbit (LEO) satellites."""
+    satellites, total_matching = dataset_processor.filter_celestrak_leo_satellites(
+        search=search,
+        regime=regime,
+        min_alt=min_alt,
+        max_alt=max_alt,
+        limit=limit,
+        offset=offset
+    )
+    return {
+        "total_leo_satellites": len(dataset_processor.leo_satellites),
+        "total_matching": total_matching,
+        "offset": offset,
+        "limit": limit,
+        "satellites": satellites
+    }
+
+
 @router.get("/records")
 def get_dataset_records(
     month: Optional[int] = Query(None, ge=1, le=12, description="Filter by month (1-12)"),
@@ -314,6 +347,14 @@ def export_dataset_csv():
 
 
 class MLPredictRequest(BaseModel):
+    # CelesTrak LEO Satellite Orbital Features
+    satellite_altitude_km: float = 500.0
+    elevation_deg: float = 45.0
+    slant_range_km: Optional[float] = None
+    inclination_deg: float = 97.4
+    mean_motion_rev_per_day: float = 15.24
+    satellite_name: Optional[str] = "Micius LEO Satellite (NORAD 41740)"
+    # NASA POWER Meteorological Features
     temperature_c: float = 25.0
     dew_point_c: float = 16.0
     relative_humidity_percent: float = 58.0
@@ -328,7 +369,7 @@ class MLPredictRequest(BaseModel):
 
 @router.get("/ml/status")
 def get_ml_status() -> Dict[str, Any]:
-    """Retrieve machine learning model training status, test metrics, and feature importances."""
+    """Retrieve machine learning model training status, test metrics, and multi-source feature importances."""
     if not ml_trainer.is_trained:
         ml_trainer.train_models()
     return ml_trainer.training_summary
@@ -336,13 +377,13 @@ def get_ml_status() -> Dict[str, Any]:
 
 @router.post("/ml/train")
 def retrain_ml_models() -> Dict[str, Any]:
-    """Triggers complete retraining of Random Forest regressors & classifiers on the 8,760 hours dataset."""
+    """Triggers complete retraining of Random Forest regressors & classifiers on the joined CelesTrak LEO (14,120 satellites) and NASA POWER (8,760 hours) datasets."""
     return ml_trainer.train_models()
 
 
 @router.post("/ml/predict")
 def predict_with_ml(req: MLPredictRequest) -> Dict[str, Any]:
-    """Executes ML model inference and compares against physical model projections."""
+    """Executes multi-source ML model inference (CelesTrak LEO + NASA POWER) and compares against physical model projections."""
     input_dict = req.model_dump()
     if req.record_id:
         rec = dataset_processor.get_record_by_id(req.record_id)
@@ -377,7 +418,21 @@ def predict_with_ml(req: MLPredictRequest) -> Dict[str, Any]:
                 "skr_residual_bps": round(abs(pred["predicted_skr_bps"] - phys_skr), 1)
             }
     else:
-        # Calculate physics model prediction for arbitrary custom inputs
+        # Calculate physics model prediction incorporating CelesTrak LEO orbital slant range
+        alt = float(input_dict.get("satellite_altitude_km", 500.0))
+        el_deg = float(input_dict.get("elevation_deg", 45.0))
+        el_rad = math.radians(el_deg)
+        earth_r = 6371.0
+
+        if input_dict.get("slant_range_km"):
+            d_slant = float(input_dict["slant_range_km"])
+        else:
+            term = (earth_r * math.sin(el_rad)) ** 2 + 2.0 * earth_r * alt + (alt ** 2)
+            d_slant = math.sqrt(max(1.0, term)) - earth_r * math.sin(el_rad)
+
+        geom_loss = 24.20 + 20.0 * math.log10(max(100.0, d_slant) / 500.0)
+        airmass = 1.0 / max(0.05, math.sin(el_rad) + 0.00186 * ((el_deg + 3.8) ** -1.253))
+
         t2m = input_dict.get("temperature_c", 25.0)
         t2mdew = input_dict.get("dew_point_c", 16.0)
         rh2m = input_dict.get("relative_humidity_percent", 58.0)
@@ -408,8 +463,8 @@ def predict_with_ml(req: MLPredictRequest) -> Dict[str, Any]:
         q_val = 0.585 * (vis ** (1.0 / 3.0)) if vis < 6.0 else 1.3
         alpha_aer = (3.91 / max(0.1, vis)) * ((550.0 / 1550.0) ** q_val) * 4.343
         alpha_rain = (0.35 * (precip ** 0.65)) if precip > 0.0 else 0.0
-        atm_loss = (alpha_aer * 2.5) + (alpha_rain * 2.0) + (cld * 0.035)
-        total_loss = 24.20 + atm_loss + 2.10 + 0.71 + 0.97
+        atm_loss = ((alpha_aer * 2.5) + (alpha_rain * 2.0)) * airmass + (cld * 0.035)
+        total_loss = geom_loss + atm_loss + 2.10 + 0.71 + 0.97
 
         transmittance = 10.0 ** (-total_loss / 10.0)
         rep_rate = 1e7
@@ -418,7 +473,7 @@ def predict_with_ml(req: MLPredictRequest) -> Dict[str, Any]:
         det_rate = rep_rate * mu * transmittance * 0.80
         qber_sim = max(0.015, min(0.50, (0.015 * det_rate + dark_count * rep_rate * 0.5) / max(1.0, det_rate + dark_count * rep_rate)))
 
-        if qber_sim < 0.11 and total_loss < 45.0:
+        if qber_sim < 0.11 and total_loss < 46.0:
             h2 = -qber_sim * math.log2(qber_sim) - (1.0 - qber_sim) * math.log2(1.0 - qber_sim)
             skr_sim = max(0.0, 0.5 * det_rate * (1.0 - 2.16 * h2))
         else:
