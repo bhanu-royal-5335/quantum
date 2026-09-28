@@ -14,6 +14,7 @@ from .api.reports import router as reports_router
 from .api.satellite import router as satellite_router
 from .api.weather import router as weather_router
 from .api.dataset import router as dataset_router
+from .api.quantum_simulation import router as quantum_simulation_router
 
 
 @asynccontextmanager
@@ -46,6 +47,7 @@ app.include_router(reports_router)
 app.include_router(satellite_router)
 app.include_router(weather_router)
 app.include_router(dataset_router)
+app.include_router(quantum_simulation_router)
 
 
 @app.get("/api/health")

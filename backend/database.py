@@ -227,6 +227,22 @@ def init_db():
         FOREIGN KEY (scenario_id) REFERENCES scenarios(id)
     )
     """)
+
+    # Dedicated Quantum Simulation Experiments table
+    cursor.execute("""
+    CREATE TABLE IF NOT EXISTS quantum_experiments (
+        id TEXT PRIMARY KEY,
+        timestamp TEXT NOT NULL,
+        satellite TEXT NOT NULL,
+        distance_km REAL NOT NULL,
+        num_bits INTEGER NOT NULL,
+        eavesdropping_enabled INTEGER NOT NULL,
+        eavesdropping_probability REAL NOT NULL,
+        qber REAL NOT NULL,
+        estimated_skr REAL NOT NULL,
+        results_json TEXT NOT NULL
+    )
+    """)
     conn.commit()
 
     # Seed default scenarios if empty
@@ -377,3 +393,71 @@ def get_recent_simulations(limit: int = 10) -> List[Dict[str, Any]]:
             "is_secure": data.get("is_secure")
         })
     return recent
+
+
+def save_quantum_experiment_result(result: Dict[str, Any]):
+    """
+    Persists a complete Quantum Simulation experiment run into SQLite.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        INSERT OR REPLACE INTO quantum_experiments (
+            id, timestamp, satellite, distance_km, num_bits,
+            eavesdropping_enabled, eavesdropping_probability,
+            qber, estimated_skr, results_json
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+        """,
+        (
+            result["id"],
+            result["timestamp"],
+            str(result.get("satellite", "micius")),
+            float(result.get("distance_km", 500.0)),
+            int(result.get("num_bits", 10000)),
+            1 if result.get("eavesdropping_enabled") else 0,
+            float(result.get("eavesdropping_probability", 0.0)),
+            float(result.get("qber", 0.0)),
+            float(result.get("estimated_skr", 0.0)),
+            json.dumps(result)
+        )
+    )
+    conn.commit()
+    conn.close()
+
+
+def get_quantum_experiment_history(limit: int = 15) -> List[Dict[str, Any]]:
+    """
+    Retrieves recent Quantum Simulation experiment summaries.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute(
+        """
+        SELECT id, timestamp, satellite, distance_km, num_bits,
+               eavesdropping_enabled, eavesdropping_probability,
+               qber, estimated_skr
+        FROM quantum_experiments
+        ORDER BY timestamp DESC
+        LIMIT ?
+        """,
+        (limit,)
+    )
+    rows = cursor.fetchall()
+    conn.close()
+    return [dict(r) for r in rows]
+
+
+def get_quantum_experiment_result(exp_id: str) -> Optional[Dict[str, Any]]:
+    """
+    Retrieves full details of a saved Quantum Simulation experiment by ID.
+    """
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT results_json FROM quantum_experiments WHERE id = ?", (exp_id,))
+    row = cursor.fetchone()
+    conn.close()
+    if not row:
+        return None
+    return json.loads(row["results_json"])
+

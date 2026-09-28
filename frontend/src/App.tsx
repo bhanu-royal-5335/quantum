@@ -10,6 +10,7 @@ import { SimulationPage } from './pages/SimulationPage';
 import { ResultsPage } from './pages/ResultsPage';
 import { ComparePage } from './pages/ComparePage';
 import { ReportPage } from './pages/ReportPage';
+import { QuantumSimulationPage } from './pages/QuantumSimulationPage';
 import { ErrorBoundary } from './components/ErrorBoundary';
 
 import {
@@ -418,6 +419,12 @@ export const App: React.FC = () => {
               {activePage === 'report' && (
                 <ReportPage
                   result={currentResult}
+                  onNavigate={setActivePage}
+                />
+              )}
+
+              {activePage === 'quantum-simulation' && (
+                <QuantumSimulationPage
                   onNavigate={setActivePage}
                 />
               )}

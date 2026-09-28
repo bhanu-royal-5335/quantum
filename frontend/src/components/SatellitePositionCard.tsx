@@ -133,11 +133,12 @@ export const SatellitePositionCard: React.FC<Props> = ({
               ))
             ) : (
               <>
-                <option value={41740}>Micius (QUESS - NORAD 41740)</option>
-                <option value={25544}>ISS (ZARYA - NORAD 25544)</option>
-                <option value={48274}>Tiangong Space Station (NORAD 48274)</option>
-                <option value={44713}>Starlink-1007 (NORAD 44713)</option>
-                <option value={43013}>NOAA-20 (JPSS-1 - NORAD 43013)</option>
+                <option value={41740}>LEO-QKD Reference Satellite (NORAD 41740)</option>
+                <option value={41740}>Micius LEO (QUESS - NORAD 41740)</option>
+                <option value={25544}>ISS LEO (ZARYA - NORAD 25544)</option>
+                <option value={48274}>Tiangong Space Station LEO (NORAD 48274)</option>
+                <option value={44713}>Starlink-1007 LEO (NORAD 44713)</option>
+                <option value={43013}>NOAA-20 Polar LEO (NORAD 43013)</option>
               </>
             )}
           </select>

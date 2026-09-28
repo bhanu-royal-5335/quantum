@@ -692,4 +692,146 @@ export interface MLPredictResponse {
   physics_comparison?: MLPhysicsComparison | null;
 }
 
+// ============================================================================
+// QUANTUM SIMULATION LABORATORY (BB84 EXPERIMENT)
+// ============================================================================
+
+export interface QuantumLabRequest {
+  satellite: string;
+  distance_km: number;
+  num_bits: number;
+  eavesdropping_enabled: boolean;
+  eavesdropping_probability: number;
+  attack_type: string;
+  channel_noise: number;
+  turbulence: string;
+  pointing_error: number;
+  detector_efficiency: number;
+  fec_efficiency?: number;
+  dark_count_rate?: number;
+  background_noise?: number;
+  monte_carlo_runs?: number;
+  include_charts?: boolean;
+  data_source_mode?: string;
+}
+
+export interface QuantumLabSweepPoint {
+  [key: string]: any;
+}
+
+export interface QuantumLabCharts {
+  qber_vs_eve?: Array<{
+    eve_prob: number;
+    eve_percent: number;
+    qber_percent: number;
+    skr_bps: number;
+    errors: number;
+    sifted_bits: number;
+  }>;
+  qber_vs_dist?: Array<{
+    distance_km: number;
+    qber_percent: number;
+    skr_bps: number;
+    loss_db: number;
+    detected_bits: number;
+  }>;
+  qber_vs_bits?: Array<{
+    bits: number;
+    bits_label: string;
+    qber_percent: number;
+    detected_bits: number;
+    sifted_bits: number;
+  }>;
+  skr_vs_qber?: Array<{
+    qber_percent: number;
+    theoretical_skr_fraction: number;
+    is_secure: boolean;
+  }>;
+  eve_vs_skr?: Array<{
+    eve_prob: number;
+    eve_percent: number;
+    skr_bps: number;
+    is_secure: boolean;
+    qber_percent: number;
+  }>;
+}
+
+export interface QuantumLabBitSample {
+  idx: number;
+  alice_bit: number;
+  alice_basis: string;
+  bob_basis: string;
+  bob_bit: number | null;
+  detected: boolean;
+  matched_basis: boolean;
+  is_error: boolean;
+  eve_intercepted: boolean;
+  eve_basis: string | null;
+}
+
+export interface QuantumLabLinkBudget {
+  distance_km: number;
+  pointing_jitter_urad: number;
+  turbulence_level: string;
+  geometric_loss_db: number;
+  atmospheric_loss_db: number;
+  pointing_loss_db: number;
+  turbulence_fading_loss_db: number;
+  total_loss_db: number;
+  transmittance_fraction: number;
+}
+
+export interface QuantumLabResult {
+  id: string;
+  timestamp: string;
+  satellite: string;
+  distance_km: number;
+  bits_sent: number;
+  detections: number;
+  detection_rate: number;
+  sifted_bits: number;
+  sifting_ratio: number;
+  errors: number;
+  qber: number;
+  qber_percent: number;
+  qber_std_error: number;
+  estimated_skr: number;
+  discrete_secure_bits: number;
+  is_secure: boolean;
+  security_status_message: string;
+  eavesdropping_detected: boolean;
+  eavesdropping_enabled: boolean;
+  eavesdropping_probability: number;
+  channel_noise: number;
+  channel_loss_db: number;
+  link_budget: QuantumLabLinkBudget;
+  bit_samples: QuantumLabBitSample[];
+  charts: QuantumLabCharts;
+  data_source_mode: string;
+}
+
+export interface QuantumLabHistoryItem {
+  id: string;
+  timestamp: string;
+  satellite: string;
+  distance_km: number;
+  num_bits: number;
+  eavesdropping_enabled: boolean;
+  eavesdropping_probability: number;
+  qber_percent: number;
+  estimated_skr: number;
+  errors: number;
+  sifted_bits: number;
+  is_secure: boolean;
+  eavesdropping_detected: boolean;
+}
+
+export interface QuantumSatelliteOption {
+  id: string;
+  name: string;
+  altitude_km: number;
+  norad_id: number;
+}
+
+
 

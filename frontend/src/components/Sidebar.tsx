@@ -10,7 +10,8 @@ import {
   FileText,
   Atom,
   ChevronRight,
-  Database
+  Database,
+  Zap
 } from 'lucide-react';
 
 export type PageId =
@@ -22,7 +23,8 @@ export type PageId =
   | 'simulation'
   | 'results'
   | 'compare'
-  | 'report';
+  | 'report'
+  | 'quantum-simulation';
 
 interface Props {
   activePage: PageId;
@@ -42,7 +44,6 @@ export const Sidebar: React.FC<Props> = ({ activePage, onNavigate, hasResults })
     { id: 'compare', label: 'Compare Scenarios', icon: GitCompare },
     { id: 'report', label: 'Generate Report', icon: FileText }
   ];
-
 
   return (
     <aside className="w-64 bg-slate-900 text-slate-300 flex flex-col shrink-0 min-h-screen border-r border-slate-800">
@@ -95,6 +96,35 @@ export const Sidebar: React.FC<Props> = ({ activePage, onNavigate, hasResults })
             </button>
           );
         })}
+
+        {/* Dedicated Quantum Simulation Section */}
+        <div className="pt-3 pb-1">
+          <div className="border-t border-slate-800/80 my-2" />
+          <div className="px-3 py-1 text-[10px] font-semibold text-purple-400/90 uppercase tracking-wider flex items-center justify-between">
+            <span>BB84 Laboratory</span>
+            <span className="w-1.5 h-1.5 rounded-full bg-purple-400 animate-pulse" />
+          </div>
+        </div>
+
+        <button
+          onClick={() => onNavigate('quantum-simulation')}
+          className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-all ${
+            activePage === 'quantum-simulation'
+              ? 'bg-gradient-to-r from-purple-600/30 to-cyan-600/20 text-purple-300 border border-purple-500/50 shadow-md shadow-purple-900/20'
+              : 'hover:bg-slate-800/80 text-slate-300 hover:text-white'
+          }`}
+        >
+          <div className="flex items-center gap-3">
+            <Zap className={`w-4 h-4 ${activePage === 'quantum-simulation' ? 'text-purple-400 animate-pulse' : 'text-purple-400'}`} />
+            <span className="font-semibold text-slate-100">Quantum Simulation</span>
+          </div>
+          <div className="flex items-center gap-1.5">
+            <span className="px-1.5 py-0.5 text-[9px] font-extrabold uppercase rounded bg-purple-500/25 text-purple-300 border border-purple-500/40">
+              NEW
+            </span>
+            {activePage === 'quantum-simulation' && <ChevronRight className="w-3.5 h-3.5 text-purple-400" />}
+          </div>
+        </button>
       </nav>
 
       {/* Model & Architecture Badge */}

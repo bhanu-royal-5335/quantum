@@ -13,7 +13,12 @@ import {
   QuantumSimulationResponse,
   MLStatusResponse,
   MLPredictRequest,
-  MLPredictResponse
+  MLPredictResponse,
+  QuantumLabRequest,
+  QuantumLabResult,
+  QuantumLabHistoryItem,
+  QuantumLabLinkBudget,
+  QuantumSatelliteOption
 } from '../types/quantum';
 
 const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
@@ -342,6 +347,73 @@ export async function predictWithML(payload: MLPredictRequest): Promise<MLPredic
   }
   return res.json();
 }
+
+// ============================================================================
+// QUANTUM SIMULATION LABORATORY APIS
+// ============================================================================
+
+export async function runQuantumLabSimulation(payload: QuantumLabRequest): Promise<QuantumLabResult> {
+  const res = await fetch(`${API_BASE_URL}/api/quantum-simulation/run`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const errData = await res.json().catch(() => ({ detail: 'Quantum simulation error' }));
+    throw new Error(errData.detail || `Quantum simulation failed (${res.status})`);
+  }
+  return res.json();
+}
+
+export async function fetchQuantumLabSatellites(): Promise<QuantumSatelliteOption[]> {
+  const res = await fetch(`${API_BASE_URL}/api/quantum-simulation/satellites`);
+  if (!res.ok) {
+    throw new Error('Failed to load satellites list');
+  }
+  return res.json();
+}
+
+export async function fetchQuantumLabCalculatedLoss(
+  distance_km: number,
+  pointing_error: number,
+  turbulence: string
+): Promise<QuantumLabLinkBudget> {
+  const url = `${API_BASE_URL}/api/quantum-simulation/calculate-loss?distance_km=${distance_km}&pointing_error=${pointing_error}&turbulence=${encodeURIComponent(turbulence)}`;
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw new Error('Failed to calculate channel loss');
+  }
+  return res.json();
+}
+
+export async function fetchQuantumLabHistory(limit: number = 15): Promise<QuantumLabHistoryItem[]> {
+  const res = await fetch(`${API_BASE_URL}/api/quantum-simulation/history?limit=${limit}`);
+  if (!res.ok) {
+    throw new Error('Failed to load experiment history');
+  }
+  return res.json();
+}
+
+export async function fetchQuantumLabHistoryDetail(exp_id: string): Promise<QuantumLabResult> {
+  const res = await fetch(`${API_BASE_URL}/api/quantum-simulation/history/${encodeURIComponent(exp_id)}`);
+  if (!res.ok) {
+    throw new Error('Failed to load experiment detail');
+  }
+  return res.json();
+}
+
+export async function runQuantumLabSweep(sweep_type: string, base_parameters: QuantumLabRequest): Promise<any> {
+  const res = await fetch(`${API_BASE_URL}/api/quantum-simulation/sweep`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sweep_type, base_parameters })
+  });
+  if (!res.ok) {
+    throw new Error('Failed to run parameter sweep');
+  }
+  return res.json();
+}
+
 
 
 

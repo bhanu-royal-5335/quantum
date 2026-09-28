@@ -15,6 +15,17 @@ CELESTRAK_BASE_URL = os.environ.get("CELESTRAK_BASE_URL", "https://celestrak.org
 
 # Verified reference TLEs for realistic offline / demo fallback
 CACHED_LEO_SATELLITES: Dict[str, Dict[str, Any]] = {
+    "leo_sat": {
+        "id": "leo_sat",
+        "name": "LEO-QKD Reference Satellite",
+        "norad_id": 41740,
+        "description": "Standard Low Earth Orbit (LEO) Quantum Satellite (500 km Sun-synchronous orbit, 97.4° inclination)",
+        "line1": "1 41740U 16051A   26085.52418293  .00001248  00000+0  65123-4 0  9997",
+        "line2": "2 41740  97.4321 154.2184 0014285  98.4125 261.8492 15.24187214481231",
+        "epoch": "2026-03-26 12:34:49 UTC",
+        "altitude_km": 500.0,
+        "inclination_deg": 97.4
+    },
     "micius": {
         "id": "micius",
         "name": "MICIUS (QSS / Quantum Science Satellite)",
