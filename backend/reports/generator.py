@@ -693,6 +693,20 @@ def generate_csv_report(sim: SimulationResult) -> str:
     writer.writerow(["Security Status", "SECURE" if sim.is_secure else "INSECURE"])
     writer.writerow([])
 
+    # 1B. Relay Factor Comparative Analysis (Before vs After)
+    if sim.relay_comparison:
+        comp = sim.relay_comparison
+        writer.writerow(["RELAY FACTOR IMPACT ANALYSIS (BEFORE VS AFTER RELAY FACTOR)"])
+        writer.writerow(["Physical Metric", "Before Relay (Direct LEO -> Ground)", "After Relay (Hierarchical HAP)", "Differential Improvement"])
+        writer.writerow(["Total Channel Loss (dB)", f"{comp.before_relay.total_loss_db:.2f}", f"{comp.after_relay.total_loss_db:.2f}", f"{comp.loss_reduction_db:+.2f} dB"])
+        writer.writerow(["QBER (%)", f"{comp.before_relay.qber_percent:.2f}%", f"{comp.after_relay.qber_percent:.2f}%", f"-{comp.qber_reduction_percent:.2f}%"])
+        writer.writerow(["Secret Key Rate (bps)", f"{comp.before_relay.secret_key_rate_bps:.1f}", f"{comp.after_relay.secret_key_rate_bps:.1f}", f"{comp.key_rate_gain_factor:.1f}x (+{comp.key_rate_increase_bps:,.0f} bps)"])
+        writer.writerow(["Atmospheric Attenuation (dB)", f"{comp.before_relay.atmospheric_loss_db:.2f}", f"{comp.after_relay.atmospheric_loss_db:.2f}", f"-{(comp.before_relay.atmospheric_loss_db - comp.after_relay.atmospheric_loss_db):.2f} dB"])
+        writer.writerow(["Scintillation Variance (sigma_I^2)", f"{comp.before_relay.scintillation_index:.4f}", f"{comp.after_relay.scintillation_index:.4f}", f"{comp.scintillation_reduction_factor:.1f}x suppression"])
+        writer.writerow(["Security Assessment", comp.before_relay.security_status, comp.after_relay.security_status, "Relay secures key distillation"])
+        writer.writerow(["Summary Narrative", comp.improvement_summary])
+        writer.writerow([])
+
     # 2. Dataset Integration & Data Source Provenance
     writer.writerow(["DATASET INTEGRATION & PROVENANCE MANIFEST"])
     writer.writerow(["Dataset Name", dataset_processor.metadata.get("filename", "POWER_Point_Hourly_20250101_20251231_014d00N_078d00E_LST.csv")])
