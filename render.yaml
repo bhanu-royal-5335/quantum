@@ -25,17 +25,9 @@ services:
   # Frontend Static Site (React + Vite SPA)
   # Free tier on Render CDN with automatic client-side SPA routing
   # -------------------------------------------------------------
-  - type: static
-    name: quantum-frontend
-    plan: free
-    region: oregon
-    rootDir: frontend
-    buildCommand: npm install && npm run build
-    staticPublishPath: dist
-    routes:
-      - type: rewrite
-        source: /*
-        destination: /index.html
-    envVars:
-      - key: VITE_API_BASE_URL
-        value: https://quantum-backend.onrender.com
+  - type: web
+    name: quant-um-frontend
+    runtime: static
+    staticPublishData:
+      directory: dist
+      buildCommand: npm run build

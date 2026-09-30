@@ -17,7 +17,13 @@ import uuid
 from datetime import datetime, timezone
 from typing import Dict, Any
 
-from ..models.schemas import ChannelParameters, SimulationResult, MonteCarloStats
+from ..models.schemas import (
+    ChannelParameters,
+    SimulationResult,
+    MonteCarloStats,
+    RelayStageMetrics,
+    RelayComparison
+)
 from .atmosphere import calculate_dual_link_atmosphere
 from .turbulence import evaluate_turbulence_link
 from .pointing_error import evaluate_pointing_link
@@ -32,6 +38,112 @@ from .qber import (
     generate_key_rate_vs_conditions_curve,
     generate_qber_vs_loss_curve
 )
+
+
+def compute_relay_stage_metrics(params: ChannelParameters, force_has_relay: bool) -> RelayStageMetrics:
+    """
+    Computes exact physical optical link budget and quantum metrics for
+    either before (direct LEO -> Ground) or after (hierarchical LEO -> Relay -> Ground) relay factor.
+    """
+    atm_results = calculate_dual_link_atmosphere(
+        satellite_altitude_km=params.satellite_altitude,
+        has_relay=force_has_relay,
+        relay_altitude_km=params.relay_altitude,
+        relay_efficiency=params.relay_efficiency,
+        relay_aperture_m=params.relay_aperture,
+        tx_aperture_m=params.transmitter_aperture,
+        rx_aperture_m=params.receiver_aperture,
+        beam_divergence_urad=params.beam_divergence,
+        wavelength_nm=params.wavelength,
+        visibility_km=params.visibility,
+        custom_link1_km=params.link1_distance,
+        custom_link2_km=params.link2_distance
+    )
+    
+    target_beam_waist = (
+        atm_results["beam_waist_link2_m"] if force_has_relay else atm_results["beam_waist_link1_m"]
+    )
+    downlink_distance = (
+        atm_results["link2_distance_km"] if force_has_relay else atm_results["link1_distance_km"]
+    )
+
+    pointing_results = evaluate_pointing_link(
+        pointing_level=params.pointing_level,
+        custom_jitter_urad=params.pointing_error,
+        rx_aperture_m=params.receiver_aperture,
+        beam_waist_radius_m=target_beam_waist,
+        distance_km=downlink_distance
+    )
+
+    turb_results = evaluate_turbulence_link(
+        turbulence_level=params.turbulence_level,
+        custom_cn2=params.cn2_ground,
+        wavelength_nm=params.wavelength,
+        has_relay=force_has_relay,
+        satellite_altitude_km=params.satellite_altitude,
+        relay_altitude_km=params.relay_altitude,
+        rx_aperture_m=params.receiver_aperture,
+        link2_distance_km=downlink_distance
+    )
+
+    t_atm_geo = atm_results["total_transmittance"]
+    t_pointing = pointing_results["mean_transmittance"]
+    total_channel_transmittance = max(1e-18, min(1.0, t_atm_geo * t_pointing))
+    pointing_loss_db = pointing_results["pointing_loss_db"]
+    total_channel_loss_db = atm_results["total_loss_db"] + pointing_loss_db
+
+    det_probs = calculate_detection_probabilities(
+        total_channel_transmittance=total_channel_transmittance,
+        mean_photon_number=params.mean_photon_number,
+        detector_efficiency=params.detector_efficiency,
+        dark_count_rate=params.dark_count_rate,
+        background_noise=params.background_noise,
+        optical_error_rate=params.optical_error_rate
+    )
+
+    p_click = det_probs["p_click"]
+    expected_sifted = int(params.num_bits * p_click * 0.5)
+    skr_res = calculate_secure_key_rate(
+        qber=det_probs["qber"],
+        sifted_key_length=max(10, expected_sifted),
+        repetition_rate_hz=params.repetition_rate,
+        p_click=p_click,
+        fec_efficiency=params.fec_efficiency
+    )
+
+    stage_name = (
+        f"After Relay Factor (Hierarchical LEO → HAP {params.relay_altitude:.0f}km → Ground)"
+        if force_has_relay else
+        "Before Relay Factor (Direct LEO → Ground Downlink)"
+    )
+    description = (
+        f"Transmitted via {params.relay_altitude:.1f} km Stratospheric HAP Relay with {params.relay_aperture:.2f} m aperture and {int(params.relay_efficiency*100)}% throughput. Bypasses 90%+ of turbulent boundary troposphere."
+        if force_has_relay else
+        f"Direct space-to-ground downlink traversing the full {int(atm_results['total_distance_km'])} km slant path through dense boundary-layer aerosols and turbulence without relay assistance."
+    )
+
+    return RelayStageMetrics(
+        has_relay=force_has_relay,
+        stage_name=stage_name,
+        description=description,
+        total_distance_km=round(atm_results["total_distance_km"], 2),
+        total_loss_db=round(total_channel_loss_db, 2),
+        atmospheric_loss_db=round(atm_results["atmospheric_loss_db"], 2),
+        geometric_loss_db=round(atm_results["geometric_loss_db"], 2),
+        pointing_loss_db=round(pointing_loss_db, 2),
+        relay_loss_db=round(atm_results["relay_loss_db"], 2),
+        total_transmittance=float(total_channel_transmittance),
+        qber=round(det_probs["qber"], 5),
+        qber_percent=round(det_probs["qber"] * 100.0, 2),
+        secret_key_rate_bps=round(skr_res["secret_key_rate_bps"], 2),
+        detection_rate_percent=round(p_click * 100.0, 3),
+        rytov_variance=round(turb_results["rytov_variance"], 4),
+        scintillation_index=round(turb_results["scintillation_index"], 4),
+        snr_db=round(det_probs["snr_db"], 2),
+        is_secure=skr_res["is_secure"],
+        security_status=skr_res["security_status_message"],
+        beam_waist_m=round(target_beam_waist, 3)
+    )
 
 
 def run_full_quantum_simulation(
@@ -244,6 +356,39 @@ def run_full_quantum_simulation(
         "snr_db": det_probs["snr_db"]
     }
 
+    # 10. Dual-Stage Analysis: Before Relay Factor vs After Relay Factor
+    before_relay_stage = compute_relay_stage_metrics(params, force_has_relay=False)
+    after_relay_stage = compute_relay_stage_metrics(params, force_has_relay=True)
+
+    loss_reduction_db = round(before_relay_stage.total_loss_db - after_relay_stage.total_loss_db, 2)
+    qber_reduction_pct = round((before_relay_stage.qber - after_relay_stage.qber) * 100.0, 2)
+    gain_factor = round(after_relay_stage.secret_key_rate_bps / max(1.0, before_relay_stage.secret_key_rate_bps), 2)
+    increase_bps = round(after_relay_stage.secret_key_rate_bps - before_relay_stage.secret_key_rate_bps, 2)
+    scint_factor = round(before_relay_stage.scintillation_index / max(1e-4, after_relay_stage.scintillation_index), 2)
+
+    if qber_reduction_pct > 0:
+        summary_text = (
+            f"Relay Factor provides a {loss_reduction_db:+.1f} dB optical loss improvement, "
+            f"slashing QBER by {qber_reduction_pct:.2f}% (from {before_relay_stage.qber_percent:.2f}% down to {after_relay_stage.qber_percent:.2f}%) "
+            f"and boosting Secret Key Rate by {gain_factor:.1f}× (+{increase_bps:,.0f} bps)."
+        )
+    else:
+        summary_text = (
+            f"Relay optical insertion loss ({after_relay_stage.relay_loss_db:.1f} dB) exceeds tropospheric bypass savings "
+            f"under high visibility conditions (ΔLoss = {loss_reduction_db:+.1f} dB)."
+        )
+
+    relay_comparison = RelayComparison(
+        before_relay=before_relay_stage,
+        after_relay=after_relay_stage,
+        loss_reduction_db=loss_reduction_db,
+        qber_reduction_percent=qber_reduction_pct,
+        key_rate_gain_factor=gain_factor,
+        key_rate_increase_bps=increase_bps,
+        scintillation_reduction_factor=scint_factor,
+        improvement_summary=summary_text
+    )
+
     return SimulationResult(
         id=sim_id,
         scenario_id=scenario_id,
@@ -294,5 +439,8 @@ def run_full_quantum_simulation(
         qber_vs_loss_curve=qber_vs_loss_curve,
 
         # Quantum simulation statistics
-        quantum_simulation_stats=quantum_stats
+        quantum_simulation_stats=quantum_stats,
+
+        # Dual-Stage Relay Comparison
+        relay_comparison=relay_comparison
     )

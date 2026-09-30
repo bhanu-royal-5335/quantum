@@ -233,6 +233,43 @@ export interface SimulationResult {
   reference_qber?: number;
   qber_difference?: number;
   quantum_simulation_stats?: Record<string, any>;
+
+  // Dual-stage before and after relay factor comparison
+  relay_comparison?: RelayComparison;
+}
+
+export interface RelayStageMetrics {
+  has_relay: boolean;
+  stage_name: string;
+  description: string;
+  total_distance_km: number;
+  total_loss_db: number;
+  atmospheric_loss_db: number;
+  geometric_loss_db: number;
+  pointing_loss_db: number;
+  relay_loss_db: number;
+  total_transmittance: number;
+  qber: number;
+  qber_percent: number;
+  secret_key_rate_bps: number;
+  detection_rate_percent: number;
+  rytov_variance: number;
+  scintillation_index: number;
+  snr_db: number;
+  is_secure: boolean;
+  security_status: string;
+  beam_waist_m: number;
+}
+
+export interface RelayComparison {
+  before_relay: RelayStageMetrics;
+  after_relay: RelayStageMetrics;
+  loss_reduction_db: number;
+  qber_reduction_percent: number;
+  key_rate_gain_factor: number;
+  key_rate_increase_bps: number;
+  scintillation_reduction_factor: number;
+  improvement_summary: string;
 }
 
 export interface ScenarioComparisonResponse {

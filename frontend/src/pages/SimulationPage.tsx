@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { ChannelParameters, SimulationResult } from '../types/quantum';
 import { BitTraceTable } from '../components/BitTraceTable';
+import { RelayFactorComparisonCard } from '../components/RelayFactorComparisonCard';
 import { PageId } from '../components/Sidebar';
 
 interface Props {
@@ -226,6 +227,17 @@ export const SimulationPage: React.FC<Props> = ({
           })}
         </div>
       </div>
+
+      {/* Dual-Stage Relay Factor Comparative Analysis (Before vs After) */}
+      {currentResult && (
+        <RelayFactorComparisonCard
+          result={currentResult}
+          parameters={parameters}
+          onChangeParameters={onChangeParameters}
+          onRunSimulation={onRunSimulation}
+          isSimulating={isSimulating}
+        />
+      )}
 
       {/* Completed Results Summary Callout */}
       {currentResult && (

@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { SimulationResult, RealisticSimulationResult } from '../types/quantum';
 import { KpiCards } from '../components/KpiCards';
+import { RelayFactorComparisonCard } from '../components/RelayFactorComparisonCard';
 import { LossVsDistanceChart } from '../charts/LossVsDistanceChart';
 import { QberVsTurbulenceChart } from '../charts/QberVsTurbulenceChart';
 import { QberVsPointingChart } from '../charts/QberVsPointingChart';
@@ -119,6 +120,9 @@ export const ResultsPage: React.FC<Props> = ({ result, realisticResult, onNaviga
 
       {/* KPI Cards Overview */}
       <KpiCards result={effectiveResult} />
+
+      {/* Dual-Stage Verification: Before Relay Factor vs. After Relay Factor */}
+      <RelayFactorComparisonCard result={effectiveResult} onNavigate={onNavigate as any} />
 
       {/* DATA SOURCE INDICATORS & PROVENANCE VERIFICATION (REQUIREMENT #18) */}
       <div className="bg-white rounded-xl border border-slate-200 p-4 shadow-sm">
