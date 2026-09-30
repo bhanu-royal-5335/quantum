@@ -70,7 +70,8 @@ def run_realistic_simulation(payload: RealisticSimulationRequest):
             ground_station=payload.ground_station,
             custom_params=payload.parameters,
             use_live_weather=payload.use_live_weather,
-            use_live_tle=payload.use_live_tle
+            use_live_tle=payload.use_live_tle,
+            use_pass_culmination=payload.use_pass_culmination
         )
         # Also persist the core simulation result to history
         save_simulation_result(res.simulation_result)

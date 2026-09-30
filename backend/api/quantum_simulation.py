@@ -39,6 +39,10 @@ class QuantumLabRunRequest(BaseModel):
     pointing_error: float = Field(5.0, ge=0.0, le=30.0, description="Pointing jitter in microradians (urad)")
     detector_efficiency: float = Field(0.80, ge=0.05, le=1.0, description="Bob detector quantum efficiency (0.05 to 1.0)")
     fec_efficiency: float = Field(1.16, ge=1.0, le=2.0, description="Error correction inefficiency factor (f_EC)")
+    has_relay: bool = Field(True, description="Whether stratospheric HAP optical relay is active")
+    relay_altitude_km: float = Field(20.0, ge=10.0, le=50.0, description="HAP Relay altitude in km")
+    relay_efficiency: float = Field(0.85, ge=0.1, le=1.0, description="Optical relay transmittance efficiency")
+    relay_aperture_m: float = Field(0.35, ge=0.1, le=2.0, description="Optical relay aperture diameter in meters")
     dark_count_rate: float = Field(1e-6, ge=1e-8, le=1e-2, description="Detector dark count probability")
     background_noise: float = Field(1e-6, ge=1e-8, le=1e-2, description="Background ambient noise probability")
     monte_carlo_runs: int = Field(100, ge=10, le=5000, description="Number of Monte Carlo verification runs")
@@ -71,15 +75,24 @@ def get_satellites():
 def get_calculated_loss(
     distance_km: float = 500.0,
     pointing_error: float = 5.0,
-    turbulence: str = "moderate"
+    turbulence: str = "moderate",
+    has_relay: bool = True,
+    relay_altitude_km: float = 20.0,
+    relay_efficiency: float = 0.85,
+    relay_aperture_m: float = 0.35
 ):
     """
-    Real-time endpoint returning calculated channel loss in dB based on slider adjustments.
+    Real-time endpoint returning calculated channel loss in dB based on slider adjustments
+    and HAP relay deployment state.
     """
     budget = calculate_fso_link_budget(
         distance_km=distance_km,
         pointing_jitter_urad=pointing_error,
-        turbulence_level=turbulence
+        turbulence_level=turbulence,
+        has_relay=has_relay,
+        relay_altitude_km=relay_altitude_km,
+        relay_efficiency=relay_efficiency,
+        relay_aperture_m=relay_aperture_m
     )
     return budget
 
@@ -91,7 +104,7 @@ def run_quantum_simulation_experiment(payload: QuantumLabRunRequest):
     detected bits, sifted bits, errors, QBER, SKR, and interactive sweep curves.
     """
     try:
-        # Run discrete BB84 protocol
+        # Run discrete BB84 protocol with HAP relay consideration
         sim_result = run_bb84_simulation(
             num_bits=payload.num_bits,
             distance_km=payload.distance_km,
@@ -104,6 +117,10 @@ def run_quantum_simulation_experiment(payload: QuantumLabRunRequest):
             pointing_error=payload.pointing_error,
             detector_efficiency=payload.detector_efficiency,
             fec_efficiency=payload.fec_efficiency,
+            has_relay=payload.has_relay,
+            relay_altitude_km=payload.relay_altitude_km,
+            relay_efficiency=payload.relay_efficiency,
+            relay_aperture_m=payload.relay_aperture_m,
             sample_trace_count=40
         )
 
@@ -131,6 +148,7 @@ def run_quantum_simulation_experiment(payload: QuantumLabRunRequest):
             "qber_percent": sim_result["qber_percent"],
             "qber_std_error": sim_result["qber_std_error"],
             "estimated_skr": sim_result["estimated_skr"],
+            "secret_key_rate": sim_result["estimated_skr"],
             "discrete_secure_bits": sim_result["discrete_secure_bits"],
             "is_secure": sim_result["is_secure"],
             "security_status_message": sim_result["security_status_message"],
@@ -142,6 +160,8 @@ def run_quantum_simulation_experiment(payload: QuantumLabRunRequest):
             "link_budget": sim_result["link_budget"],
             "bit_samples": sim_result["bit_samples"],
             "charts": charts_data,
+            "has_relay": sim_result.get("has_relay", payload.has_relay),
+            "relay_stats": sim_result.get("relay_stats"),
             "data_source_mode": payload.data_source_mode
         }
 

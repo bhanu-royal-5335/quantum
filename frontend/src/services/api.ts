@@ -23,7 +23,20 @@ import {
   QuantumSatelliteOption
 } from '../types/quantum';
 
-const API_BASE_URL = (import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000').replace(/\/$/, '');
+const API_BASE_URL = (
+  import.meta.env.VITE_API_BASE_URL !== undefined && import.meta.env.VITE_API_BASE_URL !== ''
+    ? import.meta.env.VITE_API_BASE_URL
+    : (import.meta.env.DEV ? 'http://127.0.0.1:8000' : '')
+).replace(/\/$/, '');
+
+function buildApiUrl(path: string): URL {
+  const cleanPath = path.startsWith('/') ? path : `/${path}`;
+  if (API_BASE_URL) {
+    return new URL(`${API_BASE_URL}${cleanPath}`);
+  }
+  const origin = typeof window !== 'undefined' && window.location ? window.location.origin : 'http://127.0.0.1:8000';
+  return new URL(cleanPath, origin);
+}
 
 export async function fetchScenarios(): Promise<ScenarioResponse[]> {
   const res = await fetch(`${API_BASE_URL}/api/scenarios`);
@@ -62,7 +75,7 @@ export async function runSimulation(
   scenarioId?: string,
   scenarioName?: string
 ): Promise<SimulationResult> {
-  const url = new URL(`${API_BASE_URL}/api/simulation/run`);
+  const url = buildApiUrl('/api/simulation/run');
   if (scenarioId) url.searchParams.append('scenario_id', scenarioId);
   if (scenarioName) url.searchParams.append('scenario_name', scenarioName);
 
@@ -150,7 +163,7 @@ export async function fetchSatellitePosition(
   lon: number = 77.2090,
   altM: number = 216.0
 ): Promise<SatellitePosition> {
-  const url = new URL(`${API_BASE_URL}/api/satellite/position`);
+  const url = buildApiUrl('/api/satellite/position');
   url.searchParams.append('norad_id', noradId.toString());
   url.searchParams.append('lat', lat.toString());
   url.searchParams.append('lon', lon.toString());
@@ -168,7 +181,7 @@ export async function fetchWeather(
   lon: number = 77.2090,
   locationName: string = 'Primary Optical Ground Station'
 ): Promise<WeatherData> {
-  const url = new URL(`${API_BASE_URL}/api/weather`);
+  const url = buildApiUrl('/api/weather');
   url.searchParams.append('lat', lat.toString());
   url.searchParams.append('lon', lon.toString());
   url.searchParams.append('location_name', locationName);
@@ -241,7 +254,7 @@ export async function fetchDatasetRecords(params?: {
   limit?: number;
   offset?: number;
 }): Promise<DatasetRecordsResponse> {
-  const url = new URL(`${API_BASE_URL}/api/dataset/records`);
+  const url = buildApiUrl('/api/dataset/records');
   if (params?.month) url.searchParams.append('month', params.month.toString());
   if (params?.min_humidity !== undefined) url.searchParams.append('min_humidity', params.min_humidity.toString());
   if (params?.max_humidity !== undefined) url.searchParams.append('max_humidity', params.max_humidity.toString());
@@ -414,9 +427,13 @@ export async function fetchQuantumLabSatellites(): Promise<QuantumSatelliteOptio
 export async function fetchQuantumLabCalculatedLoss(
   distance_km: number,
   pointing_error: number,
-  turbulence: string
+  turbulence: string,
+  has_relay: boolean = true,
+  relay_altitude_km: number = 20.0,
+  relay_efficiency: number = 0.85,
+  relay_aperture_m: number = 0.35
 ): Promise<QuantumLabLinkBudget> {
-  const url = `${API_BASE_URL}/api/quantum-simulation/calculate-loss?distance_km=${distance_km}&pointing_error=${pointing_error}&turbulence=${encodeURIComponent(turbulence)}`;
+  const url = `${API_BASE_URL}/api/quantum-simulation/calculate-loss?distance_km=${distance_km}&pointing_error=${pointing_error}&turbulence=${encodeURIComponent(turbulence)}&has_relay=${has_relay}&relay_altitude_km=${relay_altitude_km}&relay_efficiency=${relay_efficiency}&relay_aperture_m=${relay_aperture_m}`;
   const res = await fetch(url);
   if (!res.ok) {
     throw new Error('Failed to calculate channel loss');

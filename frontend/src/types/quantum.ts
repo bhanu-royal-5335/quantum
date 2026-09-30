@@ -770,6 +770,10 @@ export interface QuantumLabRequest {
   pointing_error: number;
   detector_efficiency: number;
   fec_efficiency?: number;
+  has_relay?: boolean;
+  relay_altitude_km?: number;
+  relay_efficiency?: number;
+  relay_aperture_m?: number;
   dark_count_rate?: number;
   background_noise?: number;
   monte_carlo_runs?: number;
@@ -832,15 +836,38 @@ export interface QuantumLabBitSample {
 }
 
 export interface QuantumLabLinkBudget {
-  distance_km: number;
-  pointing_jitter_urad: number;
-  turbulence_level: string;
+  distance_km?: number;
+  pointing_jitter_urad?: number;
+  turbulence_level?: string;
   geometric_loss_db: number;
   atmospheric_loss_db: number;
   pointing_loss_db: number;
-  turbulence_fading_loss_db: number;
+  turbulence_fading_loss_db?: number;
+  turbulence_loss_db?: number;
+  relay_loss_db?: number;
   total_loss_db: number;
-  transmittance_fraction: number;
+  transmittance_fraction?: number;
+  transmittance?: number;
+  scintillation_index?: number;
+  has_relay?: boolean;
+  relay_altitude_km?: number;
+  relay_efficiency?: number;
+  relay_aperture_m?: number;
+  direct_link_loss_db?: number;
+  loss_savings_db?: number;
+}
+
+export interface QuantumLabRelayStats {
+  has_relay: boolean;
+  relay_altitude_km: number;
+  relay_efficiency: number;
+  relay_aperture_m: number;
+  qber_with_relay_percent: number;
+  qber_without_relay_percent: number;
+  qber_reduction_percent: number;
+  loss_savings_db: number;
+  skr_gain_factor: number;
+  relay_advantage_summary: string;
 }
 
 export interface QuantumLabResult {
@@ -870,6 +897,8 @@ export interface QuantumLabResult {
   bit_samples: QuantumLabBitSample[];
   charts: QuantumLabCharts;
   data_source_mode: string;
+  has_relay?: boolean;
+  relay_stats?: QuantumLabRelayStats;
 }
 
 export interface QuantumLabHistoryItem {

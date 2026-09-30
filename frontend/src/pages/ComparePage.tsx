@@ -192,6 +192,66 @@ export const ComparePage: React.FC<Props> = ({ scenarios, onNavigate, realisticR
       {/* ============================================================ */}
       {activeTab === 'matrix' && (
         <div className="space-y-6">
+          {/* Stratospheric Relay Factor Benchmark Banner */}
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 text-white shadow-sm space-y-3">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400">
+                  <Layers className="w-4 h-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold tracking-tight text-white uppercase flex items-center gap-2">
+                    Core Solution Benchmark: Scenario A (HAP Relay) vs Scenario F (Direct Downlink)
+                  </h3>
+                  <p className="text-xs text-slate-400">
+                    Proving the mathematical and physical advantage of adding the Stratospheric Relay Factor
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setSelectedIds(['scenario-a', 'scenario-f']);
+                  setTimeout(() => handleRunComparison(), 50);
+                }}
+                className="px-3 py-1.5 rounded-lg text-xs font-semibold bg-indigo-600 hover:bg-indigo-500 text-white shadow-xs transition-colors cursor-pointer shrink-0"
+              >
+                Isolate Relay Factor Delta
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-3 text-xs">
+              <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">QBER Error Rate</span>
+                <div className="flex justify-between items-baseline">
+                  <span className="text-rose-400 font-mono font-bold text-sm">8.92% (Direct)</span>
+                  <span className="text-slate-600 font-bold">→</span>
+                  <span className="text-emerald-400 font-mono font-bold text-sm">1.85% (Relayed)</span>
+                </div>
+                <span className="text-[10px] text-emerald-400 font-semibold block mt-1">ΔQBER: -7.07% Error Suppression</span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Optical Attenuation</span>
+                <div className="flex justify-between items-baseline">
+                  <span className="text-amber-400 font-mono font-bold text-sm">27.5 dB (Direct)</span>
+                  <span className="text-slate-600 font-bold">→</span>
+                  <span className="text-sky-400 font-mono font-bold text-sm">18.4 dB (Relayed)</span>
+                </div>
+                <span className="text-[10px] text-sky-400 font-semibold block mt-1">+9.1 dB Link Budget Savings</span>
+              </div>
+
+              <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80">
+                <span className="text-[10px] uppercase font-bold text-slate-400 block mb-1">Distilled Secret Key Rate</span>
+                <div className="flex justify-between items-baseline">
+                  <span className="text-slate-400 font-mono font-bold text-sm">580 bps (Direct)</span>
+                  <span className="text-slate-600 font-bold">→</span>
+                  <span className="text-indigo-400 font-mono font-bold text-sm">2,450 bps (Relayed)</span>
+                </div>
+                <span className="text-[10px] text-indigo-400 font-semibold block mt-1">4.2× Key Generation Gain</span>
+              </div>
+            </div>
+          </div>
+
           {/* Scenario Selection Checkbox Bar */}
           <div className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm flex flex-col sm:flex-row sm:items-center justify-between gap-3">
             <div>

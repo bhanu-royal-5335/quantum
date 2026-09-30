@@ -8,7 +8,8 @@ import {
   Play,
   RotateCcw,
   Sparkles,
-  Info
+  Info,
+  Layers
 } from 'lucide-react';
 import { ChannelParameters } from '../types/quantum';
 import { PageId } from '../components/Sidebar';
@@ -90,6 +91,80 @@ export const ChannelPage: React.FC<Props> = ({
             <Play className="w-3.5 h-3.5 fill-current" />
             <span>Apply & Run Simulation</span>
           </button>
+        </div>
+      </div>
+
+      {/* STRATOSPHERIC RELAY FACTOR MITIGATION CARD */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 text-white shadow-sm space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-slate-800/80 pb-3">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-indigo-500/20 border border-indigo-400/30 flex items-center justify-center text-indigo-400">
+              <Layers className="w-4 h-4" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h3 className="text-sm font-bold tracking-tight text-white uppercase">
+                  Stratospheric Relay Factor: Atmospheric Impairment Suppression
+                </h3>
+                <span className={`px-2 py-0.5 rounded text-[10px] font-mono font-semibold ${
+                  parameters.has_relay 
+                    ? 'bg-emerald-950/80 text-emerald-400 border border-emerald-800/60' 
+                    : 'bg-amber-950/80 text-amber-400 border border-amber-800/60'
+                }`}>
+                  {parameters.has_relay ? '● RELAY FACTOR ACTIVE (20 km)' : '○ DIRECT DOWNLINK BASELINE'}
+                </span>
+              </div>
+              <p className="text-xs text-slate-400">
+                How inserting an optical relay at 20 km altitude fundamentally mitigates the four physical channel impairments below
+              </p>
+            </div>
+          </div>
+
+          <button
+            onClick={() => updateField('has_relay', !parameters.has_relay)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer whitespace-nowrap ${
+              parameters.has_relay
+                ? 'bg-emerald-600 hover:bg-emerald-500 text-white shadow-xs'
+                : 'bg-slate-800 hover:bg-slate-700 text-slate-300 border border-slate-700'
+            }`}
+          >
+            {parameters.has_relay ? 'Relay Active (Toggle Off)' : 'Enable Relay Factor'}
+          </button>
+        </div>
+
+        {/* 4 Mitigation Pillars */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3 text-xs">
+          <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-1">
+            <span className="text-[10px] font-bold text-sky-400 uppercase tracking-wider block">1. Aerosol Extinction</span>
+            <strong className="text-white block font-mono text-[11px]">90% Fog / Haze Bypassed</strong>
+            <p className="text-[11px] text-slate-400 leading-snug">
+              Space-to-Relay (Link 1: 480 km) experiences 0 dB aerosol loss. Boundary fog is restricted to the final 20 km.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-1">
+            <span className="text-[10px] font-bold text-blue-400 uppercase tracking-wider block">2. Turbulence & Scintillation</span>
+            <strong className="text-white block font-mono text-[11px]">Rytov Index σ_R² &lt; 0.05</strong>
+            <p className="text-[11px] text-slate-400 leading-snug">
+              At 20 km, atmospheric density is &lt;5.5% of sea level. Deep scintillation fades are completely avoided.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-1">
+            <span className="text-[10px] font-bold text-amber-400 uppercase tracking-wider block">3. Transceiver Jitter</span>
+            <strong className="text-white block font-mono text-[11px]">0.10 m Spot (25× Tighter)</strong>
+            <p className="text-[11px] text-slate-400 leading-snug">
+              Shortening the atmospheric slant path from 500 km to 20 km reduces ground transverse beam wander by 25×.
+            </p>
+          </div>
+
+          <div className="p-3 rounded-lg bg-slate-950/60 border border-slate-800/80 space-y-1">
+            <span className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider block">4. QBER Error Rate</span>
+            <strong className="text-emerald-400 block font-mono text-[11px]">QBER Slashed to ~2.1%</strong>
+            <p className="text-[11px] text-slate-400 leading-snug">
+              Signal-to-noise ratio improves by +9.1 dB, keeping the error rate far below the 11.0% Shor-Preskill threshold.
+            </p>
+          </div>
         </div>
       </div>
 

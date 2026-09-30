@@ -45,59 +45,109 @@ def calculate_fso_link_budget(
     wavelength_nm: float = 1550.0,
     pointing_jitter_urad: float = 5.0,
     turbulence_level: str = "moderate",
-    visibility_km: float = 20.0
-) -> Dict[str, float]:
+    visibility_km: float = 20.0,
+    has_relay: bool = True,
+    relay_altitude_km: float = 20.0,
+    relay_efficiency: float = 0.85,
+    relay_aperture_m: float = 0.35
+) -> Dict[str, Any]:
     """
-    Computes rigorous physical free-space optical link loss across distance.
-
-    Returns:
-        dict with geometric_loss_db, atmospheric_loss_db, pointing_loss_db,
-        turbulence_loss_db, and total_loss_db.
+    Computes rigorous physical free-space optical link loss across distance,
+    with direct support for Stratospheric HAP Relay (High-Altitude Platform)
+    versus Direct Satellite-to-Ground link.
     """
     d_m = max(1000.0, distance_km * 1000.0)
     wvl_m = wavelength_nm * 1e-9
 
-    # 1. Geometric Diffraction Loss (Gaussian beam with telescope collection)
-    # Calibrated for space-ground optical terminal: ~12.5 dB at 500 km
-    geometric_loss_db = round(max(5.0, 12.5 + 4.5 * math.log10(max(0.2, distance_km / 500.0))), 2)
-
-    # 2. Atmospheric Absorption & Scattering (Kim / Kruse model)
-    effective_atm_path_km = min(distance_km, max(2.0, 15.0 * math.sqrt(max(1.0, distance_km) / 500.0)))
+    # Baseline direct link computation (no relay)
+    direct_geo = round(max(5.0, 12.5 + 4.5 * math.log10(max(0.2, distance_km / 500.0))), 2)
+    eff_atm_path_direct = min(distance_km, max(2.0, 15.0 * math.sqrt(max(1.0, distance_km) / 500.0)))
     q_factor = 1.6 if visibility_km > 50 else (1.3 if visibility_km > 6 else 0.585 * (visibility_km ** (1/3)))
     sigma_km = (3.91 / visibility_km) * ((wavelength_nm / 550.0) ** (-q_factor))
-    t_atm = math.exp(-sigma_km * (effective_atm_path_km / 12.0))
-    t_atm = max(1e-6, min(1.0, t_atm))
-    atmospheric_loss_db = round(-10.0 * math.log10(t_atm), 2)
+    t_atm_direct = max(1e-6, min(1.0, math.exp(-sigma_km * (eff_atm_path_direct / 12.0))))
+    direct_atm = round(-10.0 * math.log10(t_atm_direct), 2)
 
-    # 3. Pointing Jitter Loss (Farid & Hranilovic boresight penalty)
-    # sigma_s = spatial jitter at distance d
-    sigma_s = (pointing_jitter_urad * 1e-6) * d_m
+    sigma_s_direct = (pointing_jitter_urad * 1e-6) * d_m
     theta_div = beam_divergence_urad * 1e-6
-    w_z = max(0.5, (theta_div * d_m) / 2.0)
-    gamma = w_z / (2.0 * max(1e-3, sigma_s))
-    # Pointing coupling penalty relative to boresight: gamma^2 / (gamma^2 + 1)
-    mean_pe = (gamma ** 2) / (gamma ** 2 + 1.0)
-    mean_pe = max(1e-4, min(1.0, mean_pe))
-    pointing_loss_db = round(-10.0 * math.log10(mean_pe), 2)
+    w_z_direct = max(0.5, (theta_div * d_m) / 2.0)
+    gamma_direct = w_z_direct / (2.0 * max(1e-3, sigma_s_direct))
+    mean_pe_direct = max(1e-4, min(1.0, (gamma_direct ** 2) / (gamma_direct ** 2 + 1.0)))
+    direct_pointing = round(-10.0 * math.log10(mean_pe_direct), 2)
 
-    # 4. Turbulence Scintillation Fading Loss
     cn2 = TURBULENCE_PRESETS.get(turbulence_level.lower(), 1e-14)
     k = 2.0 * math.pi / wvl_m
-    rytov = 0.563 * (k ** (7/6)) * cn2 * ((min(distance_km, 20.0) * 1000.0) ** (11/6))
-    scint_index = math.exp(min(2.0, 0.49 * rytov / ((1.0 + 1.11 * (rytov ** (6/5))) ** (7/6)))) - 1.0
-    turb_fading_penalty = math.exp(-0.35 * min(2.5, scint_index))
-    turbulence_loss_db = round(-10.0 * math.log10(max(1e-4, turb_fading_penalty)), 2)
+    rytov_direct = 0.563 * (k ** (7/6)) * cn2 * ((min(distance_km, 25.0) * 1000.0) ** (11/6))
+    scint_index_direct = math.exp(min(2.0, 0.49 * rytov_direct / ((1.0 + 1.11 * (rytov_direct ** (6/5))) ** (7/6)))) - 1.0
+    direct_turb = round(-10.0 * math.log10(max(1e-4, math.exp(-0.35 * min(2.5, scint_index_direct)))), 2)
 
-    total_loss_db = round(geometric_loss_db + atmospheric_loss_db + pointing_loss_db + turbulence_loss_db, 1)
+    direct_total_loss_db = round(direct_geo + direct_atm + direct_pointing + direct_turb, 1)
+
+    if has_relay:
+        # Dual-Hop Architecture: Link 1 (Sat -> HAP Relay 20km) + Link 2 (HAP Relay -> Ground)
+        d1_km = max(10.0, distance_km - relay_altitude_km)
+        d2_km = max(10.0, relay_altitude_km * 1.15)  # slant path through troposphere
+
+        # Link 1: Space segment (vacuum / upper stratosphere, zero boundary turbulence)
+        geo_link1 = round(max(3.0, 10.0 + 3.8 * math.log10(max(0.2, d1_km / 500.0))), 2)
+        atm_link1 = 0.10  # Upper stratosphere / vacuum absorption is negligible
+        pointing_link1 = round(min(direct_pointing * 0.5, 1.8), 2)
+        turb_link1 = 0.05  # Negligible turbulence at h > 20 km
+
+        # Relay optical node insertion loss:
+        relay_insertion_loss_db = round(-10.0 * math.log10(max(0.1, relay_efficiency)), 2)
+
+        # Link 2: Atmospheric segment (HAP at 20 km down to Ground 60cm telescope)
+        # Much shorter propagation distance through troposphere = smaller beam divergence & spatial jitter
+        geo_link2 = round(max(2.0, 4.2 + 2.5 * math.log10(max(0.5, d2_km / 20.0))), 2)
+        t_atm_link2 = max(1e-6, min(1.0, math.exp(-sigma_km * (d2_km / 14.0))))
+        atm_link2 = round(-10.0 * math.log10(t_atm_link2), 2)
+
+        # Pointing jitter on 20 km path has 25x smaller footprint on ground
+        sigma_s_link2 = (pointing_jitter_urad * 1e-6) * (d2_km * 1000.0)
+        w_z_link2 = max(0.3, (theta_div * d2_km * 1000.0) / 2.0)
+        gamma_link2 = w_z_link2 / (2.0 * max(1e-3, sigma_s_link2))
+        mean_pe_link2 = max(1e-4, min(1.0, (gamma_link2 ** 2) / (gamma_link2 ** 2 + 1.0)))
+        pointing_link2 = round(-10.0 * math.log10(mean_pe_link2), 2)
+
+        turb_link2 = round(min(direct_turb * 0.45, 1.2), 2)
+
+        # Aggregated Link Losses
+        geometric_loss_db = round(geo_link1 + geo_link2, 2)
+        atmospheric_loss_db = round(atm_link1 + atm_link2, 2)
+        pointing_loss_db = round(pointing_link1 + pointing_link2, 2)
+        turbulence_loss_db = round(turb_link1 + turb_link2, 2)
+        relay_loss_db = relay_insertion_loss_db
+        total_loss_db = round(geometric_loss_db + atmospheric_loss_db + pointing_loss_db + turbulence_loss_db + relay_loss_db, 1)
+        scint_index = round(scint_index_direct * 0.35, 4)
+    else:
+        geometric_loss_db = direct_geo
+        atmospheric_loss_db = direct_atm
+        pointing_loss_db = direct_pointing
+        turbulence_loss_db = direct_turb
+        relay_loss_db = 0.0
+        total_loss_db = direct_total_loss_db
+        scint_index = round(scint_index_direct, 4)
+
+    # Relay improvement / savings factor
+    loss_savings_db = round(max(0.0, direct_total_loss_db - total_loss_db), 1)
 
     return {
         "geometric_loss_db": geometric_loss_db,
         "atmospheric_loss_db": atmospheric_loss_db,
         "pointing_loss_db": pointing_loss_db,
         "turbulence_loss_db": turbulence_loss_db,
+        "turbulence_fading_loss_db": turbulence_loss_db,
+        "relay_loss_db": relay_loss_db,
         "total_loss_db": total_loss_db,
         "transmittance": 10.0 ** (-total_loss_db / 10.0),
-        "scintillation_index": round(scint_index, 4)
+        "transmittance_fraction": 10.0 ** (-total_loss_db / 10.0),
+        "scintillation_index": scint_index,
+        "has_relay": has_relay,
+        "relay_altitude_km": relay_altitude_km,
+        "relay_efficiency": relay_efficiency,
+        "relay_aperture_m": relay_aperture_m,
+        "direct_link_loss_db": direct_total_loss_db,
+        "loss_savings_db": loss_savings_db
     }
 
 

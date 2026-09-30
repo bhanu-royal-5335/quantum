@@ -172,3 +172,11 @@ python -m backend.tests.run_tests
 * **Scenario D:** Strong Turbulence ($C_n^2 = 1.0 \times 10^{-13}\text{ m}^{-2/3}$)
 * **Scenario E:** High Platform Pointing Jitter ($\sigma_s = 10.0\ \mu\text{rad}$)
 * **Scenario F:** Direct Downlink Without Relay (LEO to Ground direct slant path)
+
+---
+
+## Cloud Deployment (Render)
+
+This repository includes a production-ready Render Blueprint specification ([render.yaml](render.yaml)) and unified multi-stage [Dockerfile](Dockerfile).
+
+For complete step-by-step instructions on deploying via Render Blueprint or single Docker container, see **[RENDER_DEPLOYMENT.md](RENDER_DEPLOYMENT.md)**.

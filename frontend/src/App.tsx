@@ -307,6 +307,8 @@ export const App: React.FC = () => {
           isBackendConnected={isBackendConnected}
           qber={currentResult?.qber}
           channelLoss={currentResult?.channel_loss_db}
+          hasRelay={parameters.has_relay}
+          relayAltitude={parameters.relay_altitude}
           simulationMode={simulationMode}
           onModeChange={setSimulationMode}
         />

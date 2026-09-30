@@ -329,3 +329,17 @@ def test_quantum_api_simulation_and_comparison():
     assert resp.qber_comparison.reference_qber == 0.025
     assert len(resp.bit_samples) > 0
     assert len(resp.qber_vs_loss_curve) > 0
+
+
+def test_nasa_dataset_realistic_simulation():
+    from backend.api.dataset import simulate_from_dataset_record, DatasetSimulateRequest
+    
+    # Test realistic pass on clear NASA dataset record (Record 1000)
+    req = DatasetSimulateRequest(record_id=1000, satellite_norad_id=41740)
+    res = simulate_from_dataset_record(req)
+    assert res.simulation_result.channel_loss_db < 40.0
+    assert res.simulation_result.qber < 0.11, f"Expected QBER < 11%, got {res.simulation_result.qber*100}%"
+    assert res.simulation_result.is_secure is True
+    assert res.simulation_result.secret_key_rate > 0.0
+    assert res.geometry.line_of_sight is True
+    assert res.position.elevation_deg >= 10.0

@@ -19,7 +19,8 @@ from backend.tests.test_simulation import (
     test_quantum_noiseless_channel,
     test_quantum_known_error_rate,
     test_quantum_high_loss_and_noise_dominance,
-    test_quantum_api_simulation_and_comparison
+    test_quantum_api_simulation_and_comparison,
+    test_nasa_dataset_realistic_simulation
 )
 
 tests = [
@@ -37,7 +38,8 @@ tests = [
     test_quantum_noiseless_channel,
     test_quantum_known_error_rate,
     test_quantum_high_loss_and_noise_dominance,
-    test_quantum_api_simulation_and_comparison
+    test_quantum_api_simulation_and_comparison,
+    test_nasa_dataset_realistic_simulation
 ]
 
 passed = 0

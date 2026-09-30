@@ -90,6 +90,40 @@ class MonteCarloStats(BaseModel):
     confidence_interval_percent: float = 95.0
 
 
+class RelayStageMetrics(BaseModel):
+    has_relay: bool
+    stage_name: str
+    description: str
+    total_distance_km: float
+    total_loss_db: float
+    atmospheric_loss_db: float
+    geometric_loss_db: float
+    pointing_loss_db: float
+    relay_loss_db: float
+    total_transmittance: float
+    qber: float
+    qber_percent: float
+    secret_key_rate_bps: float
+    detection_rate_percent: float
+    rytov_variance: float
+    scintillation_index: float
+    snr_db: float
+    is_secure: bool
+    security_status: str
+    beam_waist_m: float
+
+
+class RelayComparison(BaseModel):
+    before_relay: RelayStageMetrics
+    after_relay: RelayStageMetrics
+    loss_reduction_db: float
+    qber_reduction_percent: float
+    key_rate_gain_factor: float
+    key_rate_increase_bps: float
+    scintillation_reduction_factor: float
+    improvement_summary: str
+
+
 class SimulationResult(BaseModel):
     id: str
     scenario_id: Optional[str] = None
@@ -143,6 +177,7 @@ class SimulationResult(BaseModel):
     reference_qber: Optional[float] = None
     qber_difference: Optional[float] = None
     quantum_simulation_stats: Optional[Dict[str, Any]] = None
+    relay_comparison: Optional[RelayComparison] = None
 
 
 class QberComparison(BaseModel):
@@ -299,6 +334,7 @@ class RealisticSimulationRequest(BaseModel):
     parameters: Optional[ChannelParameters] = None
     use_live_weather: bool = True
     use_live_tle: bool = True
+    use_pass_culmination: bool = Field(True, description="When satellite is below horizon, evaluate at culmination peak of overpass")
 
 
 class RealisticSimulationResult(BaseModel):

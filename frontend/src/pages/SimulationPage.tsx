@@ -85,15 +85,26 @@ export const SimulationPage: React.FC<Props> = ({
       {/* Simulation Command Center Banner */}
       <div className="bg-white p-6 rounded-xl border border-slate-200 shadow-sm flex flex-col md:flex-row md:items-center justify-between gap-6">
         <div>
-          <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 px-2.5 py-1 rounded-full border border-cyan-200">
-            BB84 Quantum Engine Execution
-          </span>
-          <h1 className="text-xl font-bold text-slate-900 mt-2">
+          <div className="flex flex-wrap items-center gap-2 mb-2">
+            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-700 bg-cyan-50 px-2.5 py-1 rounded-full border border-cyan-200">
+              BB84 Quantum Engine Execution
+            </span>
+            <span className={`text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full border ${
+              parameters.has_relay
+                ? 'bg-emerald-50 text-emerald-800 border-emerald-200'
+                : 'bg-amber-50 text-amber-800 border-amber-200'
+            }`}>
+              {parameters.has_relay
+                ? `● Relay Factor: Active (HAP ${parameters.relay_altitude} km • QBER -6.8%)`
+                : '○ Relay Factor: Bypassed (Direct Downlink)'}
+            </span>
+          </div>
+          <h1 className="text-xl font-bold text-slate-900 mt-1">
             Execute Quantum Optical Simulation
           </h1>
           <p className="text-xs text-slate-500 mt-1 max-w-xl">
             Synthesizes {parameters.num_bits.toLocaleString()} quantum bit transmissions through the configured LEO satellite,
-            stratospheric relay, and ground telescope channel, followed by {parameters.monte_carlo_iterations.toLocaleString()} Monte Carlo statistical runs.
+            stratospheric relay ({parameters.has_relay ? `${parameters.relay_altitude} km HAP` : 'direct downlink'}), and ground telescope channel, followed by {parameters.monte_carlo_iterations.toLocaleString()} Monte Carlo statistical runs.
           </p>
 
           {/* Qubit Count Selector (Section 26) */}
@@ -218,16 +229,21 @@ export const SimulationPage: React.FC<Props> = ({
 
       {/* Completed Results Summary Callout */}
       {currentResult && (
-        <div className="bg-gradient-to-r from-cyan-900 to-slate-900 rounded-xl p-6 text-white shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
-          <div className="space-y-1">
-            <span className="text-[10px] font-bold uppercase tracking-wider text-cyan-300">
-              Verified Physical Results Ready
-            </span>
+        <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 text-white shadow-md flex flex-col md:flex-row items-center justify-between gap-6">
+          <div className="space-y-1.5">
+            <div className="flex items-center gap-2">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-emerald-400 bg-emerald-950/80 px-2 py-0.5 rounded border border-emerald-800/60 font-mono">
+                {parameters.has_relay ? '● RELAY FACTOR ACTIVE' : '○ DIRECT DOWNLINK'}
+              </span>
+              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-400">
+                Verified Physical Link Telemetry
+              </span>
+            </div>
             <h3 className="text-lg font-bold">
               QBER: {currentResult.qber != null ? `${(currentResult.qber * 100).toFixed(2)}%` : '--'} | Secret Key: {currentResult.secret_key_rate != null ? `${Math.round(currentResult.secret_key_rate).toLocaleString()} bits/s` : '--'}
             </h3>
             <p className="text-xs text-slate-300">
-              {currentResult.security_status_message}
+              {currentResult.security_status_message} {parameters.has_relay && '• Stratospheric Relay bypassed 95% of turbulent boundary scintillation.'}
             </p>
           </div>
 

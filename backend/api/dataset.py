@@ -29,6 +29,7 @@ class DatasetSimulateRequest(BaseModel):
     satellite_norad_id: int = 41740
     use_dataset_location: bool = True
     channel_parameters: Optional[ChannelParameters] = None
+    use_pass_culmination: bool = True
 
 NORAD_MAP = {
     41740: "micius",
@@ -177,7 +178,10 @@ def get_joined_pass(
     )
 
     pass_trajectory = []
-    weather_loss = rec["simulated_atmospheric_loss_db"]
+    cloud_loss = round(rec["derived_cloud_cover_percent"] * 0.035, 2)
+    rain_loss = round(0.35 * (rec["precipitation_mmh"] ** 0.65) if rec["precipitation_mmh"] > 0 else 0.0, 2)
+    humidity_loss = round((rec["relative_humidity_percent"] / 100.0) * 0.8, 2)
+    extra_weather_loss = cloud_loss + rain_loss + humidity_loss
 
     for pt in raw_pass:
         el = pt["elevation_deg"]
@@ -190,7 +194,7 @@ def get_joined_pass(
             pt_skr = 0.0
         else:
             pt_airmass = calculate_atmospheric_airmass(el)
-            pt_loss = round(20.0 + 8.0 * (pt_airmass - 1.0) + weather_loss + (rng / 500.0) * 3.0, 2)
+            pt_loss = round(20.0 + 8.0 * (pt_airmass - 1.0) + extra_weather_loss + (rng / 500.0) * 3.0, 2)
             pt_t = 10.0 ** (-pt_loss / 10.0)
             det = calculate_detection_probabilities(
                 total_channel_transmittance=pt_t,
@@ -256,6 +260,11 @@ def simulate_from_dataset_record(req: DatasetSimulateRequest) -> RealisticSimula
         min_elevation_deg=10.0
     )
 
+    cloud_loss = round(rec["derived_cloud_cover_percent"] * 0.035, 2)
+    rain_loss = round(0.35 * (rec["precipitation_mmh"] ** 0.65) if rec["precipitation_mmh"] > 0 else 0.0, 2)
+    humidity_loss = round((rec["relative_humidity_percent"] / 100.0) * 0.8, 2)
+    total_weather_loss = round(cloud_loss + rain_loss + humidity_loss, 2)
+
     weather = WeatherData(
         visibility_km=rec["derived_visibility_km"],
         cloud_cover_percent=rec["derived_cloud_cover_percent"],
@@ -266,10 +275,10 @@ def simulate_from_dataset_record(req: DatasetSimulateRequest) -> RealisticSimula
         condition=rec["weather_condition"],
         source=f"NASA POWER MERRA-2 (Record #{rec['id']} - {rec['timestamp']})",
         is_live=False,
-        cloud_loss_db=round(rec["derived_cloud_cover_percent"] * 0.035, 2),
-        rain_loss_db=round(0.35 * (rec["precipitation_mmh"] ** 0.65) if rec["precipitation_mmh"] > 0 else 0.0, 2),
-        humidity_loss_db=round((rec["relative_humidity_percent"] / 100.0) * 0.8, 2),
-        total_weather_loss_db=round(rec["simulated_atmospheric_loss_db"], 2)
+        cloud_loss_db=cloud_loss,
+        rain_loss_db=rain_loss,
+        humidity_loss_db=humidity_loss,
+        total_weather_loss_db=total_weather_loss
     )
 
     params = req.channel_parameters or ChannelParameters()
@@ -284,7 +293,8 @@ def simulate_from_dataset_record(req: DatasetSimulateRequest) -> RealisticSimula
         custom_params=params,
         use_live_tle=True,
         use_live_weather=False,
-        custom_weather=weather
+        custom_weather=weather,
+        use_pass_culmination=req.use_pass_culmination
     )
 
     # Attach dataset reference QBER and comparison delta for validation

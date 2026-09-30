@@ -23,7 +23,11 @@ from ..models.schemas import (
     SimulationResult
 )
 from ..satellite.celestrak import fetch_satellite_tle
-from ..satellite.skyfield_propagation import propagate_satellite, compute_satellite_pass_trajectory
+from ..satellite.skyfield_propagation import (
+    propagate_satellite,
+    compute_satellite_pass_trajectory,
+    find_satellite_overpass_culmination
+)
 from ..satellite.geometry import calculate_hierarchical_link_geometry, calculate_atmospheric_airmass
 from ..weather.weather_service import fetch_weather_data, calculate_weather_optical_loss
 from .channel import run_full_quantum_simulation
@@ -40,7 +44,8 @@ def run_realistic_quantum_simulation(
     custom_params: ChannelParameters = None,
     use_live_weather: bool = True,
     use_live_tle: bool = True,
-    custom_weather: WeatherData = None
+    custom_weather: WeatherData = None,
+    use_pass_culmination: bool = True
 ) -> RealisticSimulationResult:
     """
     Executes the end-to-end realistic quantum communication simulation.
@@ -56,7 +61,7 @@ def run_realistic_quantum_simulation(
     sat_dict = fetch_satellite_tle(satellite_id)
     sat_info = SatelliteInfo(**sat_dict)
 
-    # 2. SKYFIELD: Propagate orbit to compute real-time look angles and subpoint
+    # 2. SKYFIELD: Propagate orbit to compute look angles and subpoint
     pos_dict = propagate_satellite(
         line1=sat_info.line1,
         line2=sat_info.line2,
@@ -67,6 +72,19 @@ def run_realistic_quantum_simulation(
         observation_dt=now_utc,
         min_elevation_deg=ground_station.min_elevation_deg
     )
+    # If the satellite is currently below horizon and culmination mode is enabled (default),
+    # propagate at the operational overpass culmination peak so the simulation evaluates an active QKD window.
+    if use_pass_culmination and not pos_dict.get("line_of_sight", False):
+        pos_dict = find_satellite_overpass_culmination(
+            line1=sat_info.line1,
+            line2=sat_info.line2,
+            name=sat_info.name,
+            ground_lat=ground_station.latitude,
+            ground_lon=ground_station.longitude,
+            ground_elevation_m=ground_station.elevation_m,
+            start_dt=now_utc,
+            min_elevation_deg=ground_station.min_elevation_deg
+        )
     sat_position = SatellitePosition(**pos_dict)
 
     # 3. BASELINE PARAMETERS: Merge with user parameters or sensible defaults
@@ -119,8 +137,6 @@ def run_realistic_quantum_simulation(
     params.atmospheric_condition = weather_data.condition.lower()
 
     # 6. RUN PHYSICAL QUANTUM SIMULATION
-    # If the satellite is physically occluded by Earth curvature (below min elevation):
-    # The optical line of sight is extinguished.
     scenario_title = f"Realistic Pass: {sat_info.name} → {ground_station.name}"
     
     sim_result = run_full_quantum_simulation(
@@ -129,14 +145,12 @@ def run_realistic_quantum_simulation(
         scenario_name=scenario_title
     )
 
-    # Incorporate weather optical losses (cloud, rain, humidity) and air-mass slant path
+    # Incorporate weather optical losses (cloud, rain, humidity)
     extra_weather_loss = weather_data.total_weather_loss_db
-    airmass = link_geometry.airmass_factor
-    # Slant path scales atmospheric loss by airmass factor (relative to zenith)
-    scaled_atm_loss = sim_result.atmospheric_loss_db * max(1.0, airmass)
+    # Atmospheric loss from run_full_quantum_simulation already integrates the slant propagation distance
     adjusted_channel_loss = (
         sim_result.geometric_loss_db +
-        scaled_atm_loss +
+        sim_result.atmospheric_loss_db +
         sim_result.pointing_loss_db +
         sim_result.relay_loss_db +
         extra_weather_loss
@@ -183,7 +197,16 @@ def run_realistic_quantum_simulation(
             background_noise=params.background_noise,
             sample_trace_count=35
         )
-        sim_result.qber = round(bb84_res["simulated_qber"], 5) if bb84_res["sifted_key_length"] > 0 else round(det_probs["qber"], 5)
+        s_len = bb84_res["sifted_key_length"]
+        if s_len >= 30:
+            sim_q = bb84_res["simulated_qber"]
+        elif s_len > 0:
+            # Bayesian shrinkage against small-sample noise fluctuation
+            sim_q = (s_len * bb84_res["simulated_qber"] + 30 * det_probs["qber"]) / (s_len + 30)
+        else:
+            sim_q = det_probs["qber"]
+
+        sim_result.qber = round(sim_q, 5)
         sim_result.sifted_key_length = bb84_res["sifted_key_length"]
         sim_result.total_detected_photons = bb84_res["total_detected"]
         sim_result.error_bits = bb84_res["error_bits"]
@@ -204,6 +227,11 @@ def run_realistic_quantum_simulation(
         sim_result.security_status_message = skr_res["security_status_message"]
 
     # 7. SATELLITE PASS TRAJECTORY & REALISTIC TIME SERIES CHARTS
+    try:
+        traj_center = datetime.fromisoformat(sat_position.timestamp)
+    except Exception:
+        traj_center = now_utc
+
     raw_pass = compute_satellite_pass_trajectory(
         line1=sat_info.line1,
         line2=sat_info.line2,
@@ -213,7 +241,8 @@ def run_realistic_quantum_simulation(
         ground_elevation_m=ground_station.elevation_m,
         min_elevation_deg=ground_station.min_elevation_deg,
         duration_minutes=16,
-        num_points=25
+        num_points=25,
+        center_dt=traj_center
     )
 
     pass_trajectory: List[PassTrajectoryPoint] = []

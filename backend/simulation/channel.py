@@ -124,12 +124,14 @@ def run_full_quantum_simulation(
         sample_trace_count=35
     )
 
-    # Use simulated QBER from quantum measurement & sifting
-    actual_qber = (
-        bb84_res["simulated_qber"]
-        if bb84_res["sifted_key_length"] > 0
-        else det_probs["qber"]
-    )
+    # Use simulated QBER from quantum measurement & sifting with Bayesian shrinkage for small samples
+    s_len = bb84_res["sifted_key_length"]
+    if s_len >= 30:
+        actual_qber = bb84_res["simulated_qber"]
+    elif s_len > 0:
+        actual_qber = (s_len * bb84_res["simulated_qber"] + 30 * det_probs["qber"]) / (s_len + 30)
+    else:
+        actual_qber = det_probs["qber"]
 
     # 7. Secret-Key Rate and Information Reconciliation
     skr_res = calculate_secure_key_rate(
