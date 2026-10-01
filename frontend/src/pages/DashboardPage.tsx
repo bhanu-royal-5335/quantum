@@ -24,6 +24,7 @@ import {
   GroundStationConfig
 } from '../types/quantum';
 import { ArchitectureVisualizer } from '../components/ArchitectureVisualizer';
+import { NqmLiveVisualizer } from '../components/NqmLiveVisualizer';
 import { KpiCards } from '../components/KpiCards';
 import { RealisticPipelineVisualizer } from '../components/RealisticPipelineVisualizer';
 import { SatellitePositionCard } from '../components/SatellitePositionCard';
@@ -244,6 +245,9 @@ export const DashboardPage: React.FC<Props> = ({
         </div>
         <KpiCards result={currentResult} />
       </div>
+
+      {/* NQM Live 3D Earth Orbit & Stratospheric Relay Quantum Visualizer */}
+      <NqmLiveVisualizer className="mb-4" />
 
       {/* Interactive System Architecture Visualization (Requirement 2 & 18: LEO -> Relay -> Bob) */}
       <ArchitectureVisualizer

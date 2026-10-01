@@ -10,7 +10,7 @@ import {
   FileText,
   Radio,
   Database,
-  Binary
+  Satellite
 } from 'lucide-react';
 
 export type PageId =
@@ -20,10 +20,10 @@ export type PageId =
   | 'channel'
   | 'dataset'
   | 'simulation'
+  | 'quantum-simulation'
   | 'results'
   | 'compare'
-  | 'report'
-  | 'quantum-simulation';
+  | 'report';
 
 interface Props {
   activePage: PageId;
@@ -62,7 +62,7 @@ export const Sidebar: React.FC<Props> = ({ activePage, onNavigate, hasResults })
       title: 'Quantum Simulation',
       items: [
         { id: 'simulation', label: 'Channel & Attenuation', icon: PlayCircle },
-        { id: 'quantum-simulation', label: 'BB84 Quantum Lab', icon: Binary, hint: 'Discrete Photons' },
+        { id: 'quantum-simulation', label: 'NQM Satellite QKD Simulator', icon: Radio, hint: 'NQM Simulator' },
         { id: 'results', label: 'QBER & Secret Key Yield', icon: BarChart3, hint: hasResults ? 'Computed' : undefined }
       ]
     },
@@ -79,16 +79,16 @@ export const Sidebar: React.FC<Props> = ({ activePage, onNavigate, hasResults })
     <aside className="w-64 bg-slate-950 text-slate-300 flex flex-col shrink-0 min-h-screen border-r border-slate-800/80 select-none">
       {/* Brand Header */}
       <div className="p-4 border-b border-slate-800/80 flex items-center gap-3">
-        <div className="w-9 h-9 rounded-lg bg-slate-900 border border-slate-700/80 flex items-center justify-center text-sky-400 shadow-sm shrink-0">
-          <Radio className="w-4 h-4 text-sky-400" />
+        <div className="w-9 h-9 rounded-lg bg-sky-950/80 border border-sky-500/40 flex items-center justify-center text-sky-400 shadow-sm shrink-0">
+          <Satellite className="w-4 h-4 text-sky-400 animate-pulse" />
         </div>
         <div className="min-w-0">
           <div className="flex items-center gap-1.5">
             <h1 className="text-sm font-bold text-white tracking-tight leading-tight">
               QuantumSim
             </h1>
-            <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-slate-800 text-slate-400 border border-slate-700 font-mono">
-              FSO
+            <span className="text-[10px] font-semibold px-1.5 py-0.2 rounded bg-sky-950 text-sky-300 border border-sky-500/40 font-mono">
+              NQM
             </span>
           </div>
           <span className="text-[10px] text-slate-400 tracking-wide block truncate">
@@ -113,15 +113,15 @@ export const Sidebar: React.FC<Props> = ({ activePage, onNavigate, hasResults })
                 <button
                   key={item.id}
                   onClick={() => onNavigate(item.id)}
-                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left relative group ${
+                  className={`w-full flex items-center justify-between px-3 py-2 rounded-lg text-xs font-medium transition-colors text-left relative group cursor-pointer ${
                     isActive
-                      ? 'bg-slate-800/90 text-white font-semibold'
+                      ? 'bg-sky-500/20 text-sky-200 font-semibold border border-sky-500/30 shadow-sm'
                       : 'text-slate-400 hover:text-slate-200 hover:bg-slate-900/80'
                   }`}
                 >
                   {/* Left accent bar on active */}
                   {isActive && (
-                    <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-sky-500" />
+                    <span className="absolute left-0 top-1.5 bottom-1.5 w-1 rounded-r bg-sky-400" />
                   )}
 
                   <div className="flex items-center gap-2.5 min-w-0">
@@ -137,7 +137,7 @@ export const Sidebar: React.FC<Props> = ({ activePage, onNavigate, hasResults })
                     <span
                       className={`text-[10px] font-mono px-1.5 py-0.5 rounded border shrink-0 ${
                         isActive
-                          ? 'bg-slate-900 text-sky-300 border-sky-500/30'
+                          ? 'bg-sky-950 text-sky-300 border-sky-500/30'
                           : 'bg-slate-900/60 text-slate-500 border-slate-800'
                       }`}
                     >
@@ -151,20 +151,20 @@ export const Sidebar: React.FC<Props> = ({ activePage, onNavigate, hasResults })
         ))}
       </nav>
 
-      {/* Human Mission Telemetry Footer */}
+      {/* Mission Telemetry Footer */}
       <div className="p-3.5 border-t border-slate-800/80 bg-slate-950/80 text-[11px] text-slate-400 space-y-2">
         <div className="flex items-center justify-between">
           <span className="text-slate-500 font-medium">Ground Station</span>
-          <span className="font-mono text-slate-300 text-[10px]">Tenerife OGS-1</span>
+          <span className="font-mono text-slate-300 text-[10px] truncate max-w-[125px]">Rayalaseema OGS</span>
         </div>
         <div className="flex items-center justify-between">
-          <span className="text-slate-500 font-medium">Orbit Propagator</span>
-          <span className="font-mono text-slate-300 text-[10px]">SGP4 Perturbation</span>
+          <span className="text-slate-500 font-medium">Dataset Status</span>
+          <span className="font-mono text-emerald-400 text-[10px]">● Connected</span>
         </div>
         <div className="pt-1.5 border-t border-slate-900 flex items-center justify-between text-[10px]">
           <span className="flex items-center gap-1.5 text-emerald-400 font-medium">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500" />
-            Engine Online
+            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            ITU-R &amp; NQM Active
           </span>
           <span className="text-slate-500 font-mono">ITU-R P.1814</span>
         </div>
